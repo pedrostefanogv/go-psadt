@@ -8,7 +8,7 @@
 
 ### Overview
 
-This directory contains four standalone, runnable Go programs demonstrating the main use cases of the `go-psadt` library. Each example is self-contained and can be compiled and run independently on a Windows machine with PSAppDeployToolkit installed.
+This directory contains standalone, runnable Go programs demonstrating the main use cases of the `go-psadt` library. Each example is self-contained and can be compiled and run independently on a Windows machine with PSAppDeployToolkit installed.
 
 ### Prerequisites
 
@@ -25,6 +25,7 @@ This directory contains four standalone, runnable Go programs demonstrating the 
 | [`uninstall/`](uninstall/) | Application search and uninstallation with registry cleanup | `Open-ADTSession`, `Show-ADTInstallationWelcome`, `Get-ADTApplication`, `Uninstall-ADTApplication`, `Remove-ADTRegistryKey` |
 | [`dialog/`](dialog/) | UI dialogs: confirmation box, balloon tip notification, installation prompt | `Show-ADTDialogBox`, `Show-ADTBalloonTip`, `Show-ADTInstallationPrompt` |
 | [`query/`](query/) | System information queries without touching the filesystem | `Get-ADTEnvironment`, `Test-ADTCallerIsAdmin`, `Test-ADTNetworkConnection`, `Get-ADTFreeDiskSpace`, `Get-ADTLoggedOnUser`, `Get-ADTPendingReboot`, `Test-ADTServiceExists` |
+| [`gui/`](gui/) | Graphical UI lab (local web app) for testing dialogs, prompts, balloon alerts, progress, welcome options, and toolkit installation checks via PSGallery | `Show-ADTDialogBox`, `Show-ADTInstallationPrompt`, `Show-ADTBalloonTip`, `Show-ADTInstallationProgress`, `Show-ADTInstallationWelcome`, `Get-ADTConfig`, `Get-ADTEnvironment` |
 
 ### Running an Example
 
@@ -40,6 +41,13 @@ Or build first:
 cd examples\install
 go build -o install.exe .
 .\install.exe
+```
+
+Build all examples and run GUI lab (Windows):
+
+```powershell
+cd examples
+.\build-and-run.ps1 -RunGui
 ```
 
 > **Note:** All examples use `//go:build windows` and will not compile on Linux or macOS.
@@ -86,7 +94,7 @@ if err != nil {
 
 ### Visão Geral
 
-Este diretório contém quatro programas Go independentes e executáveis que demonstram os principais casos de uso da biblioteca `go-psadt`. Cada exemplo é autocontido e pode ser compilado e executado individualmente em uma máquina Windows com o PSAppDeployToolkit instalado.
+Este diretório contém programas Go independentes e executáveis que demonstram os principais casos de uso da biblioteca `go-psadt`. Cada exemplo é autocontido e pode ser compilado e executado individualmente em uma máquina Windows com o PSAppDeployToolkit instalado.
 
 ### Pré-requisitos
 
@@ -103,6 +111,7 @@ Este diretório contém quatro programas Go independentes e executáveis que dem
 | [`uninstall/`](uninstall/) | Busca e desinstalação de aplicação com limpeza do registro | `Open-ADTSession`, `Show-ADTInstallationWelcome`, `Get-ADTApplication`, `Uninstall-ADTApplication`, `Remove-ADTRegistryKey` |
 | [`dialog/`](dialog/) | Diálogos de UI: caixa de confirmação, notificação balloon tip, prompt de instalação | `Show-ADTDialogBox`, `Show-ADTBalloonTip`, `Show-ADTInstallationPrompt` |
 | [`query/`](query/) | Consultas de informação do sistema sem tocar no filesystem | `Get-ADTEnvironment`, `Test-ADTCallerIsAdmin`, `Test-ADTNetworkConnection`, `Get-ADTFreeDiskSpace`, `Get-ADTLoggedOnUser`, `Get-ADTPendingReboot`, `Test-ADTServiceExists` |
+| [`gui/`](gui/) | Laboratório gráfico (web local) para testar diálogos, prompts, alertas balloon, progresso, opções de boas-vindas e checagem/instalação do toolkit via PSGallery | `Show-ADTDialogBox`, `Show-ADTInstallationPrompt`, `Show-ADTBalloonTip`, `Show-ADTInstallationProgress`, `Show-ADTInstallationWelcome`, `Get-ADTConfig`, `Get-ADTEnvironment` |
 
 ### Executando um Exemplo
 
@@ -118,6 +127,13 @@ Ou compilar antes:
 cd examples\install
 go build -o install.exe .
 .\install.exe
+```
+
+Compilar todos os exemplos e subir o GUI Lab (Windows):
+
+```powershell
+cd examples
+.\build-and-run.ps1 -RunGui
 ```
 
 > **Nota:** Todos os exemplos usam `//go:build windows` e não compilarão em Linux ou macOS.

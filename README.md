@@ -34,6 +34,29 @@ Orchestrate Windows software deployments, display UI dialogs, manage registry/se
 
 ---
 
+## Documentation Map / Mapa de Documentacao
+
+Core docs:
+
+- [README.md](README.md) - project overview and quick start
+- [ARCHITECTURE.md](ARCHITECTURE.md) - full architecture, protocol, and package design
+- [PLAN.md](PLAN.md) - implementation plan and design rationale
+
+Examples hub:
+
+- [examples/README.md](examples/README.md) - examples index and execution guidance
+- [examples/build-and-run.ps1](examples/build-and-run.ps1) - build all examples on Windows
+
+Example-specific docs and entry points:
+
+- Install: [examples/install/README.md](examples/install/README.md) | [examples/install/main.go](examples/install/main.go)
+- Uninstall: [examples/uninstall/README.md](examples/uninstall/README.md) | [examples/uninstall/main.go](examples/uninstall/main.go)
+- Dialog: [examples/dialog/README.md](examples/dialog/README.md) | [examples/dialog/main.go](examples/dialog/main.go)
+- Query: [examples/query/README.md](examples/query/README.md) | [examples/query/main.go](examples/query/main.go)
+- GUI Lab: [examples/gui/README.md](examples/gui/README.md) | [examples/gui/main.go](examples/gui/main.go)
+
+---
+
 # English
 
 ## Overview
@@ -141,124 +164,16 @@ func main() {
 
 ## Architecture
 
-The library maintains a **persistent PowerShell process** that communicates via stdin/stdout using a JSON-based protocol with delimited markers. This avoids the overhead of starting a new process for each command.
+The detailed architecture is documented in [ARCHITECTURE.md](ARCHITECTURE.md).
 
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                        Go Application                            │
-│                                                                  │
-│   client, _ := psadt.NewClient(opts...)                          │
-│   session, _ := client.OpenSession(cfg)                          │
-│   session.ShowInstallationWelcome(opts)                          │
-│   session.StartMsiProcess(opts)                                  │
-│   session.Close(0)                                               │
-└───────────────────────┬──────────────────────────────────────────┘
-                        │
-                        │  Typed Go API (compile-time safety)
-                        │
-┌───────────────────────▼──────────────────────────────────────────┐
-│                       go-psadt Library                            │
-│                                                                  │
-│  ┌──────────────┐   ┌──────────────────┐   ┌──────────────────┐ │
-│  │  cmdbuilder   │   │     runner        │   │     parser       │ │
-│  │              │   │                  │   │                  │ │
-│  │  Go struct   │   │  Persistent PS   │   │  JSON response   │ │
-│  │  + ps: tags  │   │  process with    │   │  → Go struct     │ │
-│  │  → PS command│   │  stdin/stdout    │   │  + error types   │ │
-│  │  string      │   │  pipes + mutex   │   │                  │ │
-│  └──────┬───────┘   └────────┬─────────┘   └────────┬─────────┘ │
-│         │                    │                       │           │
-└─────────┼────────────────────┼───────────────────────┼───────────┘
-          │                    │                       │
-          │   ┌────────────────▼──────────────────┐    │
-          └──►│       powershell.exe               │◄──┘
-              │       (persistent process)         │
-              │                                    │
-              │  ┌────────────────────────────┐    │
-              │  │  Import-Module PSADT       │    │
-              │  │  Open-ADTSession ...       │    │
-              │  │                            │    │
-              │  │  <<<PSADT_BEGIN>>>          │    │
-              │  │  { JSON response }         │    │
-              │  │  <<<PSADT_END>>>            │    │
-              │  └────────────────────────────┘    │
-              └────────────────────────────────────┘
-```
+Quick summary:
 
-### Communication Protocol
+- The library keeps a **persistent PowerShell process** per client.
+- Commands are serialized through a mutex and exchanged via stdin/stdout.
+- Responses use a JSON envelope with `<<<PSADT_BEGIN>>>` / `<<<PSADT_END>>>` markers.
+- Internal design is split into three core packages: `internal/cmdbuilder`, `internal/runner`, `internal/parser`.
 
-Each command is wrapped in a PowerShell `try/catch` block with JSON serialization:
-
-1. **Go → PowerShell**: `cmdbuilder` converts typed Go structs into PowerShell command strings using reflection and `ps:` struct tags
-2. **Execution**: The command runs inside the persistent PowerShell process with `<<<PSADT_BEGIN>>>` / `<<<PSADT_END>>>` delimiters
-3. **PowerShell → Go**: `parser` extracts the JSON between markers and deserializes into Go types
-4. **Concurrency**: A mutex ensures commands are serialized — one command at a time per client
-
-### Internal Packages
-
-| Package | Responsibility |
-|---|---|
-| `internal/cmdbuilder` | Converts Go option structs into PowerShell command strings via reflection on `ps:` tags. Handles string escaping, arrays, hashtables, switch parameters, and script blocks. |
-| `internal/runner` | Manages the persistent `powershell.exe` process lifecycle: start, stop, heartbeat, module import, version validation. Provides `Execute()` and `ExecuteVoid()` for command dispatch. |
-| `internal/parser` | Parses JSON responses from PowerShell into Go types. Handles success/error discrimination, typed error extraction (`PSADTError`), and convenience parsers for bool, string, uint64. |
-
-## Package Structure
-
-```
-go-psadt/
-│
-├── psadt.go              # Client struct, NewClient(), options pattern
-├── session.go            # Session lifecycle (Open/Close/GetProperties)
-├── environment.go        # Client.GetEnvironment() — ~90 PSADT variables
-│
-├── ui.go                 # 8 methods: Welcome, Prompt, Progress, Dialog, Balloon, etc.
-├── process.go            # 9 methods: Start EXE/MSI/MSP (+ AsUser), Block/Unblock
-├── application.go        # 2 methods: GetApplication, UninstallApplication
-├── registry.go           # 5 methods: Get/Set/Remove keys, Test, AllUsers action
-├── filesystem.go         # 8 methods: Copy/Remove files/folders, UserProfiles, Cache
-├── ini.go                # 6 methods: Get/Set/Remove values and sections
-├── envvar.go             # 3 methods: Get/Set/Remove environment variables
-├── shortcut.go           # 3 methods: New/Set/Get shortcuts
-├── service.go            # 5 methods: Start/Stop, Get/Set start mode, TestExists
-├── wim.go                # 3 methods: Mount/Dismount WIM, NewZipFile
-├── sysinfo.go            # 11 methods: Users, disk, reboot, OS, profiles, versions
-├── checks.go             # 10 methods: Battery, admin, network, mutex, busy state
-├── dll.go                # 3 methods: Register/Unregister DLL, RegSvr32
-├── msi.go                # 4 methods: Exit codes, table properties, transforms
-├── activesetup.go        # 1 method: SetActiveSetup
-├── edge.go               # 2 methods: Add/Remove Edge extensions
-├── system.go             # 7 methods: Desktop, GPO, Updates, SCCM, Terminal Server
-├── logging.go            # 1 method: WriteLogEntry
-├── config.go             # 6 methods: Config, StringTable, DeferHistory, Culture
-├── util.go               # 8 methods: SendKeys, permissions, retry, encoding
-│
-├── types/                # All type definitions (22 files)
-│   ├── enums.go          #   DeploymentType, DeployMode, DialogStyle, ...
-│   ├── exitcodes.go      #   Standard PSADT exit code constants
-│   ├── session.go        #   SessionConfig, SessionProperties
-│   ├── process.go        #   ProcessResult, StartProcessOptions, MsiProcessOptions, ...
-│   ├── application.go    #   InstalledApplication, GetApplicationOptions, ...
-│   ├── ui.go             #   WelcomeOptions, PromptOptions, DialogBoxOptions, ...
-│   ├── environment.go    #   EnvironmentInfo (hierarchical: OS, PowerShell, Users, ...)
-│   ├── registry.go       #   Get/Set/Remove RegistryKeyOptions, ...
-│   ├── filesystem.go     #   CopyFileOptions, RemoveFolderOptions, ...
-│   └── ...               #   service, sysinfo, shortcut, wim, dll, msi, config, ...
-│
-├── internal/
-│   ├── cmdbuilder/       # Go struct → PowerShell command string (reflection + ps: tags)
-│   ├── parser/           # JSON protocol → Go structs (success/error handling)
-│   └── runner/           # PowerShell process management (lifecycle + protocol)
-│
-├── examples/
-│   ├── install/          # Complete MSI installation example
-│   ├── uninstall/        # Application uninstallation example
-│   ├── dialog/           # UI dialogs and prompts demo
-│   └── query/            # System information queries
-│
-├── go.mod
-├── LICENSE               # MIT
-└── README.md
-```
+For complete package mapping, protocol details, and lifecycle diagrams, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Function Categories
 
@@ -299,12 +214,24 @@ psadt.WithLogger(myLogger)              // Custom *slog.Logger for diagnostics
 
 The [`examples/`](examples/) directory contains complete, runnable programs:
 
-| Example | Description |
-|---|---|
-| [`examples/install/`](examples/install/) | Full MSI installation with welcome dialog, progress bar, and registry configuration |
-| [`examples/uninstall/`](examples/uninstall/) | Application search and uninstallation with cleanup |
-| [`examples/dialog/`](examples/dialog/) | UI interactions: dialog boxes, balloon tips, installation prompts |
-| [`examples/query/`](examples/query/) | System information queries: environment, admin status, disk space, users, services |
+| Example | Guide | Entry Point | Description |
+|---|---|---|---|
+| `install` | [examples/install/README.md](examples/install/README.md) | [examples/install/main.go](examples/install/main.go) | Full MSI installation with welcome dialog, progress bar, and registry configuration |
+| `uninstall` | [examples/uninstall/README.md](examples/uninstall/README.md) | [examples/uninstall/main.go](examples/uninstall/main.go) | Application search and uninstallation with cleanup |
+| `dialog` | [examples/dialog/README.md](examples/dialog/README.md) | [examples/dialog/main.go](examples/dialog/main.go) | UI interactions: dialog boxes, balloon tips, installation prompts |
+| `query` | [examples/query/README.md](examples/query/README.md) | [examples/query/main.go](examples/query/main.go) | System information queries: environment, admin status, disk space, users, services |
+| `gui` | [examples/gui/README.md](examples/gui/README.md) | [examples/gui/main.go](examples/gui/main.go) | Graphical UI lab (local web app) to test modals, prompt styles, alerts, theme preview, and toolkit install checks |
+
+Examples index:
+
+- [examples/README.md](examples/README.md)
+
+Build all example executables on Windows:
+
+```powershell
+cd examples
+.\build-and-run.ps1
+```
 
 ## Error Handling
 
@@ -437,104 +364,16 @@ func main() {
 
 ## Arquitetura
 
-A biblioteca mantém um **processo PowerShell persistente** que se comunica via stdin/stdout usando um protocolo baseado em JSON com marcadores delimitadores. Isso evita o overhead de iniciar um novo processo para cada comando.
+A arquitetura detalhada esta em [ARCHITECTURE.md](ARCHITECTURE.md).
 
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                       Aplicação Go                               │
-│                                                                  │
-│   client, _ := psadt.NewClient(opts...)                          │
-│   session, _ := client.OpenSession(cfg)                          │
-│   session.ShowInstallationWelcome(opts)                          │
-│   session.StartMsiProcess(opts)                                  │
-│   session.Close(0)                                               │
-└───────────────────────┬──────────────────────────────────────────┘
-                        │
-                        │  API Go tipada (segurança em tempo de compilação)
-                        │
-┌───────────────────────▼──────────────────────────────────────────┐
-│                      Biblioteca go-psadt                          │
-│                                                                  │
-│  ┌──────────────┐   ┌──────────────────┐   ┌──────────────────┐ │
-│  │  cmdbuilder   │   │     runner        │   │     parser       │ │
-│  │              │   │                  │   │                  │ │
-│  │  Struct Go   │   │  Processo PS     │   │  Resposta JSON   │ │
-│  │  + tags ps:  │   │  persistente com │   │  → Struct Go     │ │
-│  │  → comando   │   │  pipes stdin/out │   │  + tipos de erro │ │
-│  │  PowerShell  │   │  + mutex         │   │                  │ │
-│  └──────┬───────┘   └────────┬─────────┘   └────────┬─────────┘ │
-│         │                    │                       │           │
-└─────────┼────────────────────┼───────────────────────┼───────────┘
-          │                    │                       │
-          │   ┌────────────────▼──────────────────┐    │
-          └──►│       powershell.exe               │◄──┘
-              │       (processo persistente)        │
-              │                                    │
-              │  ┌────────────────────────────┐    │
-              │  │  Import-Module PSADT       │    │
-              │  │  Open-ADTSession ...       │    │
-              │  │                            │    │
-              │  │  <<<PSADT_BEGIN>>>          │    │
-              │  │  { resposta JSON }         │    │
-              │  │  <<<PSADT_END>>>            │    │
-              │  └────────────────────────────┘    │
-              └────────────────────────────────────┘
-```
+Resumo rapido:
 
-### Protocolo de Comunicação
+- A biblioteca mantém um **processo PowerShell persistente** por client.
+- Os comandos são serializados por mutex e trafegam via stdin/stdout.
+- As respostas usam envelope JSON com marcadores `<<<PSADT_BEGIN>>>` / `<<<PSADT_END>>>`.
+- O design interno é dividido em três pacotes centrais: `internal/cmdbuilder`, `internal/runner`, `internal/parser`.
 
-Cada comando é envolvido em um bloco `try/catch` do PowerShell com serialização JSON:
-
-1. **Go → PowerShell**: O `cmdbuilder` converte structs Go tipadas em strings de comando PowerShell usando reflection e tags `ps:`
-2. **Execução**: O comando é executado dentro do processo PowerShell persistente com delimitadores `<<<PSADT_BEGIN>>>` / `<<<PSADT_END>>>`
-3. **PowerShell → Go**: O `parser` extrai o JSON entre os marcadores e desserializa em tipos Go
-4. **Concorrência**: Um mutex garante que os comandos são serializados — um comando por vez por cliente
-
-### Pacotes Internos
-
-| Pacote | Responsabilidade |
-|---|---|
-| `internal/cmdbuilder` | Converte structs de opções Go em strings de comando PowerShell via reflection nas tags `ps:`. Trata escaping de strings, arrays, hashtables, parâmetros switch e script blocks. |
-| `internal/runner` | Gerencia o ciclo de vida do processo `powershell.exe` persistente: start, stop, heartbeat, importação de módulo, validação de versão. Fornece `Execute()` e `ExecuteVoid()` para despacho de comandos. |
-| `internal/parser` | Faz o parsing de respostas JSON do PowerShell em tipos Go. Trata discriminação sucesso/erro, extração de erros tipados (`PSADTError`) e parsers de conveniência para bool, string, uint64. |
-
-## Estrutura de Pacotes
-
-```
-go-psadt/
-│
-├── psadt.go              # Struct Client, NewClient(), padrão options
-├── session.go            # Ciclo de vida da sessão (Open/Close/GetProperties)
-├── environment.go        # Client.GetEnvironment() — ~90 variáveis PSADT
-│
-├── ui.go                 # 8 métodos: Welcome, Prompt, Progress, Dialog, Balloon, etc.
-├── process.go            # 9 métodos: Iniciar EXE/MSI/MSP (+ AsUser), Block/Unblock
-├── application.go        # 2 métodos: GetApplication, UninstallApplication
-├── registry.go           # 5 métodos: Get/Set/Remove chaves, Test, ação AllUsers
-├── filesystem.go         # 8 métodos: Copy/Remove arquivos/pastas, UserProfiles, Cache
-├── ini.go                # 6 métodos: Get/Set/Remove valores e seções
-├── envvar.go             # 3 métodos: Get/Set/Remove variáveis de ambiente
-├── shortcut.go           # 3 métodos: New/Set/Get atalhos
-├── service.go            # 5 métodos: Start/Stop, Get/Set modo de início, TestExists
-├── wim.go                # 3 métodos: Mount/Dismount WIM, NewZipFile
-├── sysinfo.go            # 11 métodos: Usuários, disco, reboot, OS, perfis, versões
-├── checks.go             # 10 métodos: Bateria, admin, rede, mutex, estado ocupado
-├── dll.go                # 3 métodos: Register/Unregister DLL, RegSvr32
-├── msi.go                # 4 métodos: Códigos de saída, propriedades, transforms
-├── activesetup.go        # 1 método: SetActiveSetup
-├── edge.go               # 2 métodos: Add/Remove extensões Edge
-├── system.go             # 7 métodos: Desktop, GPO, Updates, SCCM, Terminal Server
-├── logging.go            # 1 método: WriteLogEntry
-├── config.go             # 6 métodos: Config, StringTable, DeferHistory, Culture
-├── util.go               # 8 métodos: SendKeys, permissões, retry, encoding
-│
-├── types/                # Todas as definições de tipos (22 arquivos)
-├── internal/             # Pacotes internos (cmdbuilder, parser, runner)
-├── examples/             # Programas de exemplo executáveis
-├── go.mod
-├── LICENSE               # MIT
-└── README.md
-```
+Para mapeamento completo de pacotes, detalhes do protocolo e diagramas de ciclo de vida, consulte [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Categorias de Funções
 
@@ -575,12 +414,24 @@ psadt.WithLogger(myLogger)              // *slog.Logger customizado para diagnó
 
 O diretório [`examples/`](examples/) contém programas completos e executáveis:
 
-| Exemplo | Descrição |
-|---|---|
-| [`examples/install/`](examples/install/) | Instalação MSI completa com diálogo de boas-vindas, barra de progresso e configuração de registro |
-| [`examples/uninstall/`](examples/uninstall/) | Busca e desinstalação de aplicação com limpeza |
-| [`examples/dialog/`](examples/dialog/) | Interações UI: caixas de diálogo, balloon tips, prompts de instalação |
-| [`examples/query/`](examples/query/) | Consultas de informação do sistema: ambiente, status admin, espaço em disco, usuários, serviços |
+| Exemplo | Guia | Arquivo de Entrada | Descrição |
+|---|---|---|---|
+| `install` | [examples/install/README.md](examples/install/README.md) | [examples/install/main.go](examples/install/main.go) | Instalação MSI completa com diálogo de boas-vindas, barra de progresso e configuração de registro |
+| `uninstall` | [examples/uninstall/README.md](examples/uninstall/README.md) | [examples/uninstall/main.go](examples/uninstall/main.go) | Busca e desinstalação de aplicação com limpeza |
+| `dialog` | [examples/dialog/README.md](examples/dialog/README.md) | [examples/dialog/main.go](examples/dialog/main.go) | Interações UI: caixas de diálogo, balloon tips, prompts de instalação |
+| `query` | [examples/query/README.md](examples/query/README.md) | [examples/query/main.go](examples/query/main.go) | Consultas de informação do sistema: ambiente, status admin, espaço em disco, usuários, serviços |
+| `gui` | [examples/gui/README.md](examples/gui/README.md) | [examples/gui/main.go](examples/gui/main.go) | Laboratório gráfico (web local) para testar modais, estilos de prompt, alertas, prévia de tema e checagem de instalação do toolkit |
+
+Indice de exemplos:
+
+- [examples/README.md](examples/README.md)
+
+Compilar todos os executáveis de exemplo no Windows:
+
+```powershell
+cd examples
+.\build-and-run.ps1
+```
 
 ## Tratamento de Erros
 
