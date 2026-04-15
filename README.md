@@ -69,7 +69,7 @@ Install-Module -Name PSAppDeployToolkit -Scope AllUsers
 ## Installation
 
 ```bash
-go get github.com/peterondra/go-psadt
+go get github.com/pedrostefanogv/go-psadt
 ```
 
 ## Quick Start
@@ -82,8 +82,8 @@ import (
     "log"
     "time"
 
-    "github.com/peterondra/go-psadt"
-    "github.com/peterondra/go-psadt/types"
+    "github.com/pedrostefanogv/go-psadt"
+    "github.com/pedrostefanogv/go-psadt/types"
 )
 
 func main() {
@@ -365,7 +365,7 @@ Install-Module -Name PSAppDeployToolkit -Scope AllUsers
 ## Instalação
 
 ```bash
-go get github.com/peterondra/go-psadt
+go get github.com/pedrostefanogv/go-psadt
 ```
 
 ## Início Rápido
@@ -378,8 +378,8 @@ import (
     "log"
     "time"
 
-    "github.com/peterondra/go-psadt"
-    "github.com/peterondra/go-psadt/types"
+    "github.com/pedrostefanogv/go-psadt"
+    "github.com/pedrostefanogv/go-psadt/types"
 )
 
 func main() {

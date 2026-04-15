@@ -5,8 +5,8 @@ package psadt
 import (
 	"fmt"
 
-	"github.com/peterondra/go-psadt/internal/cmdbuilder"
-	"github.com/peterondra/go-psadt/types"
+	"github.com/pedrostefanogv/go-psadt/internal/cmdbuilder"
+	"github.com/pedrostefanogv/go-psadt/types"
 )
 
 // RegisterDll registers a DLL file.

@@ -13,7 +13,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/peterondra/go-psadt/internal/runner"
+	"github.com/pedrostefanogv/go-psadt/internal/runner"
 )
 
 const (

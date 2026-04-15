@@ -8,8 +8,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/peterondra/go-psadt"
-	"github.com/peterondra/go-psadt/types"
+	"github.com/pedrostefanogv/go-psadt"
+	"github.com/pedrostefanogv/go-psadt/types"
 )
 
 func main() {

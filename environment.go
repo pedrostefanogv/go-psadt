@@ -6,8 +6,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/peterondra/go-psadt/internal/parser"
-	"github.com/peterondra/go-psadt/types"
+	"github.com/pedrostefanogv/go-psadt/internal/parser"
+	"github.com/pedrostefanogv/go-psadt/types"
 )
 
 // GetEnvironment collects all PSADT environment variables and returns them

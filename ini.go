@@ -5,8 +5,8 @@ package psadt
 import (
 	"fmt"
 
-	"github.com/peterondra/go-psadt/internal/cmdbuilder"
-	"github.com/peterondra/go-psadt/internal/parser"
+	"github.com/pedrostefanogv/go-psadt/internal/cmdbuilder"
+	"github.com/pedrostefanogv/go-psadt/internal/parser"
 )
 
 // GetIniValue reads a value from an INI file.

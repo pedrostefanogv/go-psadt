@@ -3,8 +3,8 @@
 package psadt
 
 import (
-	"github.com/peterondra/go-psadt/internal/cmdbuilder"
-	"github.com/peterondra/go-psadt/types"
+	"github.com/pedrostefanogv/go-psadt/internal/cmdbuilder"
+	"github.com/pedrostefanogv/go-psadt/types"
 )
 
 // SetActiveSetup creates or modifies an Active Setup registry entry.

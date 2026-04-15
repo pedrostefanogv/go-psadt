@@ -5,9 +5,9 @@ package psadt
 import (
 	"fmt"
 
-	"github.com/peterondra/go-psadt/internal/cmdbuilder"
-	"github.com/peterondra/go-psadt/internal/parser"
-	"github.com/peterondra/go-psadt/types"
+	"github.com/pedrostefanogv/go-psadt/internal/cmdbuilder"
+	"github.com/pedrostefanogv/go-psadt/internal/parser"
+	"github.com/pedrostefanogv/go-psadt/types"
 )
 
 // GetConfig retrieves the current PSADT configuration.
