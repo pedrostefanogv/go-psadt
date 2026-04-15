@@ -19,6 +19,7 @@ It lets you test:
 - Welcome modal (`ShowInstallationWelcome`) with process list and countdown.
 - Toolkit installation checks and installation via **PowerShell Gallery** (`CurrentUser` or `AllUsers`).
 - Visual config snippet generation for Fluent/Classic style and assets (icon/banner).
+- Runtime diagnostics via `/diag`, including client reconnect count and last invalidation reason.
 
 ### Run
 
@@ -37,6 +38,8 @@ http://127.0.0.1:17841
 
 - The panel has its own light/dark mode toggle for easier testing.
 - Fluent/Classic, accent color, and asset files are controlled by PSADT configuration. The app generates a ready-to-use snippet for `config.psd1`.
+- `Show-ADTInstallationProgress` opens a separate WPF window, so it can appear in the Windows taskbar as its own window.
+- `/diag` exposes `client_reconnect_count`, `last_client_invalidation_reason`, and `last_client_invalidation_at` to make reconnect behavior observable.
 - For `AllUsers` installation, open terminal as Administrator.
 
 ---
@@ -56,6 +59,7 @@ Ele permite testar:
 - Modal de boas-vindas (`ShowInstallationWelcome`) com lista de processos e contagem regressiva.
 - Verificação e instalação do toolkit via **PowerShell Gallery** (`CurrentUser` ou `AllUsers`).
 - Geração de snippet de configuração visual para Fluent/Classic e assets (ícone/banner).
+- Diagnóstico de runtime via `/diag`, incluindo contagem de reconexões do client e motivo da última invalidação.
 
 ### Executar
 
@@ -74,4 +78,6 @@ http://127.0.0.1:17841
 
 - O painel possui alternância claro/escuro para facilitar os testes.
 - Fluent/Classic, cor de destaque e arquivos de assets dependem da configuração ativa do PSADT. O app gera snippet pronto para `config.psd1`.
+- `Show-ADTInstallationProgress` abre uma janela WPF separada, então pode aparecer como janela própria na barra de tarefas do Windows.
+- O endpoint `/diag` expõe `client_reconnect_count`, `last_client_invalidation_reason` e `last_client_invalidation_at` para tornar o comportamento de reconexão observável.
 - Para instalação `AllUsers`, execute o terminal como Administrador.

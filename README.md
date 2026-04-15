@@ -142,6 +142,9 @@ func main() {
     }
     defer session.Close(0)
 
+    // Close-ADTSession may terminate the underlying PowerShell runner.
+    // Session.Close still treats that expected shutdown as success.
+
     // Show welcome dialog — prompt to close running apps
     session.ShowInstallationWelcome(types.WelcomeOptions{
         CloseProcesses:          []types.ProcessDefinition{{Name: "widget"}},
@@ -171,6 +174,7 @@ Quick summary:
 - The library keeps a **persistent PowerShell process** per client.
 - Commands are serialized through a mutex and exchanged via stdin/stdout.
 - Responses use a JSON envelope with `<<<PSADT_BEGIN>>>` / `<<<PSADT_END>>>` markers.
+- `Session.Close()` treats runner termination during `Close-ADTSession` as a successful session shutdown; callers that reuse clients should check `client.IsAlive()` and recreate the runner when needed.
 - Internal design is split into three core packages: `internal/cmdbuilder`, `internal/runner`, `internal/parser`.
 
 For complete package mapping, protocol details, and lifecycle diagrams, see [ARCHITECTURE.md](ARCHITECTURE.md).

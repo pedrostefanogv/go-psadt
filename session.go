@@ -5,6 +5,7 @@ package psadt
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/pedrostefanogv/go-psadt/internal/cmdbuilder"
 	"github.com/pedrostefanogv/go-psadt/internal/parser"
@@ -75,11 +76,25 @@ func (s *Session) CloseWithContext(ctx context.Context, exitCode int) error {
 	s.closed = true
 
 	if err != nil {
+		if isExpectedSessionCloseRunnerTermination(err) {
+			s.client.logger.Info("ADT session closed and PowerShell runner exited", "exitCode", exitCode)
+			return nil
+		}
 		return fmt.Errorf("failed to close ADT session: %w", err)
 	}
 
 	s.client.logger.Info("ADT session closed", "exitCode", exitCode)
 	return nil
+}
+
+func isExpectedSessionCloseRunnerTermination(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "PowerShell process ended before completing response") ||
+		strings.Contains(msg, "PowerShell runner is not running") ||
+		strings.Contains(msg, "failed to write command to PowerShell")
 }
 
 // GetProperties returns the current session properties.

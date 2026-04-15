@@ -64,6 +64,8 @@ All examples follow the same three-step pattern:
    client.Close()               → stops the PowerShell process
 ```
 
+`Session.Close()` may return `nil` even when `Close-ADTSession` tears down the PowerShell runner, because that shutdown is expected in current PSADT. If an example or app keeps a persistent client around, use `client.IsAlive()` to decide whether a reconnect is required.
+
 The `defer` pattern ensures proper cleanup even when errors occur:
 
 ```go

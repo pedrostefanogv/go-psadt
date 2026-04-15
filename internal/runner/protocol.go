@@ -16,7 +16,9 @@ const (
 func WrapCommand(psCommand string) string {
 	return fmt.Sprintf(`
 try {
-    $result = %s
+        $result = & {
+%s
+        }
     $__out = @{ Success = $true; Data = $result; Error = $null } | ConvertTo-Json -Depth 10 -Compress
 } catch {
     $__out = @{ Success = $false; Data = $null; Error = @{

@@ -33,15 +33,17 @@ const (
 type DialogPosition string
 
 const (
-	DialogPositionDefault     DialogPosition = "Default"
-	DialogPositionTopLeft     DialogPosition = "TopLeft"
-	DialogPositionTop         DialogPosition = "Top"
-	DialogPositionTopRight    DialogPosition = "TopRight"
-	DialogPositionTopCenter   DialogPosition = "TopCenter"
-	DialogPositionCenter      DialogPosition = "Center"
-	DialogPositionBottomLeft  DialogPosition = "BottomLeft"
-	DialogPositionBottom      DialogPosition = "Bottom"
-	DialogPositionBottomRight DialogPosition = "BottomRight"
+	DialogPositionDefault      DialogPosition = "Default"
+	DialogPositionTopLeft      DialogPosition = "TopLeft"
+	DialogPositionTop          DialogPosition = "Top"
+	DialogPositionTopRight     DialogPosition = "TopRight"
+	DialogPositionTopCenter    DialogPosition = "TopCenter"
+	DialogPositionCenter       DialogPosition = "Center"
+	DialogPositionBottomLeft   DialogPosition = "BottomLeft"
+	DialogPositionBottom       DialogPosition = "Bottom"
+	DialogPositionBottomRight  DialogPosition = "BottomRight"
+	DialogPositionBottomCenter DialogPosition = "BottomCenter"
+	DialogPositionOobe         DialogPosition = "Oobe"
 )
 
 // DialogSystemIcon represents dialog icons
@@ -161,6 +163,15 @@ const (
 	BalloonInfo    BalloonTipIcon = "Info"
 	BalloonWarning BalloonTipIcon = "Warning"
 	BalloonError   BalloonTipIcon = "Error"
+)
+
+// DialogBoxDefaultButton represents which button is selected by default in a dialog box
+type DialogBoxDefaultButton string
+
+const (
+	DialogDefaultFirst  DialogBoxDefaultButton = "First"
+	DialogDefaultSecond DialogBoxDefaultButton = "Second"
+	DialogDefaultThird  DialogBoxDefaultButton = "Third"
 )
 
 // MessageAlignment for dialogs

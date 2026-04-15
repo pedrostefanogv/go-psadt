@@ -57,6 +57,7 @@ func (r *Runner) readResponse(ctx context.Context) ([]byte, error) {
 	type scanResult struct {
 		line string
 		err  error
+		eof  bool
 	}
 
 	// Channel for receiving scanned lines
@@ -71,7 +72,11 @@ func (r *Runner) readResponse(ctx context.Context) ([]byte, error) {
 			if scanner.Scan() {
 				lineCh <- scanResult{line: scanner.Text()}
 			} else {
-				lineCh <- scanResult{err: scanner.Err()}
+				if err := scanner.Err(); err != nil {
+					lineCh <- scanResult{err: err}
+					return
+				}
+				lineCh <- scanResult{eof: true}
 			}
 		}()
 
@@ -81,6 +86,10 @@ func (r *Runner) readResponse(ctx context.Context) ([]byte, error) {
 		case <-time.After(timeout):
 			return nil, fmt.Errorf("timeout waiting for PowerShell response after %v", timeout)
 		case result := <-lineCh:
+			if result.eof {
+				r.running = false
+				return nil, fmt.Errorf("PowerShell process ended before completing response")
+			}
 			if result.err != nil {
 				r.running = false
 				if result.err == bufio.ErrTooLong {
