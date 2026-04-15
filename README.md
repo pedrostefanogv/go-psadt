@@ -17,10 +17,20 @@ Orchestrate Windows software deployments, display UI dialogs, manage registry/se
 
 ---
 
-> [!NOTE]
-> **AI-Assisted Development**: This project was developed with the assistance of AI tools (GitHub Copilot / Claude). All generated code was reviewed, tested, and validated to ensure correctness and quality. The architecture, design decisions, and implementation plan were human-directed.
+> [!WARNING]
+> **⚠️ AI-Generated Project — Use at Your Own Risk**
 >
-> **Desenvolvimento Assistido por IA**: Este projeto foi desenvolvido com auxílio de ferramentas de IA (GitHub Copilot / Claude). Todo o código gerado foi revisado, testado e validado para garantir correção e qualidade. A arquitetura, decisões de design e plano de implementação foram dirigidos por humanos.
+> This project was **entirely generated and assisted by AI tools** (GitHub Copilot / Claude). It is currently in an **experimental/review phase and is NOT recommended for production use**. The code has not been fully audited, may contain bugs, and could behave unexpectedly in real-world environments.
+>
+> By using this project, you accept full responsibility for any consequences. If you are not comfortable using AI-generated code, **do not use this project**.
+>
+> ---
+>
+> **⚠️ Projeto Gerado por IA — Use por Sua Própria Conta e Risco**
+>
+> Este projeto foi **inteiramente gerado e assistido por ferramentas de IA** (GitHub Copilot / Claude). Atualmente está em **fase experimental/revisão e NÃO é recomendado para uso em produção**. O código não passou por auditoria completa, pode conter bugs e pode se comportar de forma inesperada em ambientes reais.
+>
+> Ao utilizar este projeto, você assume total responsabilidade por quaisquer consequências. Se não se sentir confortável com o uso de código gerado por IA, **não utilize este projeto**.
 
 ---
 
