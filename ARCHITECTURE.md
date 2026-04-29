@@ -15,11 +15,13 @@
 7. [internal/runner — Process Management](#7-internalrunner--process-management)
 8. [internal/parser — Response Parsing](#8-internalparser--response-parsing)
 9. [Client and Session Design](#9-client-and-session-design)
-10. [Type System](#10-type-system)
-11. [Concurrency Model](#11-concurrency-model)
-12. [Error Handling Chain](#12-error-handling-chain)
-13. [Build Constraints and Platform Scope](#13-build-constraints-and-platform-scope)
-14. [Design Decisions](#14-design-decisions)
+10. [Batch Execution & Context Propagation](#10-batch-execution--context-propagation)
+11. [Live Output Streaming](#11-live-output-streaming)
+12. [Type System](#12-type-system)
+13. [Concurrency Model](#13-concurrency-model)
+14. [Error Handling Chain](#14-error-handling-chain)
+15. [Build Constraints and Platform Scope](#15-build-constraints-and-platform-scope)
+16. [Design Decisions](#16-design-decisions)
 
 ---
 
@@ -85,8 +87,8 @@ The library is organized in three horizontal layers:
 │                                                                 │
 │  package psadt                                                  │
 │  Client, Session, Option                                        │
-│  ~105 methods across 20 .go files                               │
-│  types/ — 22 strongly-typed option and result structs           │
+│  ~110 methods across 25 .go files                               │
+│  types/ — 24 strongly-typed option and result structs           │
 └────────────────────────────────┬────────────────────────────────┘
                                  │  depends on
 ┌────────────────────────────────▼────────────────────────────────┐
@@ -250,7 +252,7 @@ Line read     │  State machine action
 <<<PSADT_BEGIN>>> │  Set inResponse = true
 <json line>   │  Append to jsonLines (while inResponse == true)
 <<<PSADT_END>>>   │  Set inResponse = false; join jsonLines → return bytes
-other line    │  Discard (PS informational output, Write-Host, etc.)
+other line    │  Forward to live output stream (see §11 Live Output Streaming)
 EOF / nil     │  Return scanner error (process died)
 ```
 
@@ -380,11 +382,13 @@ type Runner struct {
     cmd           *exec.Cmd         // the powershell.exe process
     stdin         io.Writer         // StdinPipe — command input
     stdoutScanner *bufio.Scanner    // line-by-line stdout reader (10 MB buffer)
-    stderr        io.Reader         // StderrPipe — captured but not parsed
+    stderr        io.Reader         // StderrPipe — forwarded to live stream
     mu            sync.Mutex        // serializes all command dispatches
     running       bool              // false after Stop() or process death
     timeout       time.Duration     // per-command default timeout
     psPath        string            // resolved PS executable path
+    liveOutputCh  chan string       // buffered channel for live stdout/stderr lines
+    onOutput      OutputLineCallback // optional synchronous output callback
 }
 ```
 
@@ -396,13 +400,14 @@ Auto-detection order:
 
 The path is resolved by the OS via `exec.LookPath` at process startup.
 
-### 7.3 `Execute()` vs `ExecuteVoid()`
-
-Both methods delegate to `executeWrapped(ctx, wrappedCmd)`:
+### 7.3 `Execute()` variants
 
 ```go
-func (r *Runner) Execute(ctx, psCommand)     { executeWrapped(ctx, WrapCommand(psCommand)) }
-func (r *Runner) ExecuteVoid(ctx, psCommand) { executeWrapped(ctx, WrapVoidCommand(psCommand)) }
+func (r *Runner) Execute(ctx, psCommand)       // values → WrapCommand + executeWrapped
+func (r *Runner) ExecuteVoid(ctx, psCommand)   // void → WrapVoidCommand + executeWrapped
+func (r *Runner) ExecuteBatch(ctx, commands)   // multiple → joined + WrapCommand
+func (r *Runner) ExecuteRaw(ctx, wrappedCmd)   // already wrapped → executeWrapped
+func (r *Runner) ExecuteRawVoid(ctx, wrappedCmd) // already wrapped void → executeWrapped
 ```
 
 `executeWrapped`:
@@ -410,7 +415,9 @@ func (r *Runner) ExecuteVoid(ctx, psCommand) { executeWrapped(ctx, WrapVoidComma
 2. Writes wrapped command to `r.stdin` via `fmt.Fprintln`
 3. Calls `readResponse(ctx)` → returns `[]byte` JSON
 
-Return value is `[]byte` in both cases; the `parser` layer handles the distinction.
+`ExecuteBatch` joins multiple PS commands with `; ` and wraps them once, reducing
+round-trips for multi-step operations. `ExecuteRaw`/`ExecuteRawVoid` accept
+already-wrapped commands — useful for custom scripts that callers construct manually.
 
 ### 7.4 `IsAlive()` / `Heartbeat()`
 
@@ -421,7 +428,16 @@ func (r *Runner) Heartbeat(ctx) error
 
 `IsAlive()` returns `r.running` (non-blocking). `Heartbeat()` executes `$true` through the full round-trip to confirm the process is responsive.
 
-### 7.5 `ImportModule()` / `CheckModuleVersion()`
+### 7.5 `LiveOutput()` / `drainStderr()`
+
+The runner starts a background goroutine (`drainStderr`) that continuously reads
+stderr and forwards every line to `liveOutputCh`. Non-marker stdout lines are
+also forwarded via `emitOutput()` in `readResponse()`. Both channels eventually
+arrive at the same `liveOutputCh` channel, giving the caller a unified stream.
+
+See §11 Live Output Streaming for the full design.
+
+### 7.6 `ImportModule()` / `CheckModuleVersion()`
 
 ```go
 func (r *Runner) ImportModule(ctx, moduleName) error
@@ -500,11 +516,14 @@ parser.IsUserCancelled(err)   // ExitCode 1602
 
 ```go
 type Client struct {
-    runner     *runner.Runner   // owns the PS process
-    logger     *slog.Logger     // structured logging (log/slog, Go 1.21+)
-    moduleName string           // "PSAppDeployToolkit"
-    minVersion string           // "4.1.0"
-    timeout    time.Duration    // default per-command timeout
+    runner     *runner.Runner         // owns the PS process
+    logger     *slog.Logger           // structured logging (log/slog, Go 1.21+)
+    moduleName string                 // "PSAppDeployToolkit"
+    minVersion string                 // "4.1.0"
+    timeout    time.Duration          // default per-command timeout
+    envMu      sync.Mutex             // guards envCache
+    envCache   *types.EnvironmentInfo // cached result of GetEnvironment()
+    envCached  bool                   // true when envCache is valid
 }
 ```
 
@@ -534,13 +553,16 @@ type Session struct {
     client *Client             // back-pointer for options and logger
     runner *runner.Runner      // shared with client (same PS process)
     config types.SessionConfig // the configuration passed to Open-ADTSession
+    ctx    context.Context     // embedded context; nil means use default
     closed bool                // prevents double-close
 }
 ```
 
 `Session` holds a reference to the **same** `runner.Runner` as `Client`. All commands in a session go through the same persistent process, preserving the PSADT session state (open log file, app name, etc.) between calls.
 
-### 9.4 `execute()` / `executeVoid()` helpers
+The embedded `ctx` field enables **context propagation without method duplication** (see §10).
+
+### 9.4 `execute()` / `executeVoid()` / `getContext()` helpers
 
 Session methods call private helpers instead of accessing `runner` directly:
 
@@ -553,21 +575,169 @@ func (s *Session) executeVoid(ctx, cmd) error {
     if err != nil { return err }
     return parser.CheckSuccess(data)
 }
+func (s *Session) getContext() (context.Context, context.CancelFunc) {
+    if s.ctx != nil {
+        return context.WithCancel(s.ctx)
+    }
+    return s.client.defaultContext()
+}
 ```
 
-`defaultContext()` on `Client` provides a context pre-configured with the client's default timeout:
+`getContext()` is the **single context resolution point** used by all ~100 session methods. If the session has an embedded context (set via `WithContext()`), it returns a child context with cancel propagation. Otherwise it falls back to the client's default timeout. This eliminates the need to pass `ctx` to every method individually.
+
+### 9.5 Environment Caching
+
+`Client.GetEnvironment()` caches the ~90 PSADT environment variables after the first call. Subsequent calls return the cached snapshot without a PowerShell round-trip. Call `InvalidateEnvCache()` to force a fresh fetch (e.g., after changing machine state).
+
+### 9.6 Client Reconnection
+
+For long-running RMM agents, `Client.Reconnect(ctx)` tears down the current runner and starts a fresh PowerShell process, re-importing the PSADT module. `IsAlive()` allows health checks before every operation.
+
+---
+
+## 10. Batch Execution & Context Propagation
+
+### 10.1 `ExecuteBatch` — Multi-Command Round-Trip
+
+Multiple PowerShell commands can be joined and sent in a single stdin write, reducing latency for multi-step operations:
 
 ```go
-func (c *Client) defaultContext() (context.Context, context.CancelFunc) {
-    return context.WithTimeout(context.Background(), c.timeout)
+// Without batch: 3 round-trips (3 × pipe latency)
+name, _ := session.GetRegistryKeyString(key, "DisplayName")
+ver, _  := session.GetRegistryKeyString(key, "DisplayVersion")
+ok, _   := session.TestNetworkConnection()
+
+// With batch: 1 round-trip
+data, _ := session.ExecuteBatch(ctx, []string{
+    "(Get-ADTRegistryKey -Key ...).DisplayName",
+    "(Get-ADTRegistryKey -Key ...).DisplayVersion",
+    "Test-ADTNetworkConnection",
+})
+```
+
+Implementation in `runner.ExecuteBatch()`:
+
+```go
+func (r *Runner) ExecuteBatch(ctx, commands) ([]byte, error) {
+    joined := strings.Join(commands, "; ")
+    return r.executeWrapped(ctx, WrapCommand(joined))
 }
+```
+
+All commands run inside a single `try/catch` wrapper. The return value is the JSON output of the **last** command in the sequence.
+
+### 10.2 `WithContext` — Zero-Duplication Context Propagation
+
+Instead of creating `XxxWithContext` variants for every method, the `Session` struct carries an optional embedded context:
+
+```go
+ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+defer cancel()
+result, _ := session.WithContext(ctx).GetApplication(opts)
+```
+
+`WithContext()` returns a **shallow copy** of the session with the context set. All subsequent method calls on that copy automatically use the propagated context via `getContext()` — no method duplication needed. The original session is not modified.
+
+### 10.3 `ExecuteRawScript` — Escape Hatch
+
+For PSADT operations not yet wrapped by the Go API, callers can execute arbitrary PowerShell scripts in the session context:
+
+```go
+err := session.ExecuteRawVoidScript(ctx, `
+    Write-ADTLogEntry -Message "Custom logic" -Source "rmm-agent" -Severity 1
+`)
+```
+
+`ExecuteRawScript` returns raw JSON bytes; `ExecuteRawVoidScript` checks for errors only. Both are also available at the `Client` level for scripts that don't require an open session.
+
+### 10.4 Typed Registry Access
+
+To avoid `interface{}` return types, `GetRegistryKeyString` and `GetRegistryKeyDWord` provide typed convenience wrappers:
+
+```go
+version, _ := session.GetRegistryKeyString(`HKLM\SOFTWARE\Contoso`, "Version")
+config, _  := session.GetRegistryKeyDWord(`HKLM\SOFTWARE\Contoso`, "ConfigFlag")
 ```
 
 ---
 
-## 10. Type System
+## 11. Live Output Streaming
 
-### 10.1 Struct Tags
+### 11.1 Architecture
+
+The runner exposes real-time output streaming through two mechanisms:
+
+**Channel-based (non-blocking):**
+```go
+type Runner struct {
+    // ...
+    liveOutputCh chan string  // buffered channel (256 lines)
+}
+func (r *Runner) LiveOutput() <-chan string
+```
+
+**Callback-based (synchronous):**
+```go
+type OutputLineCallback func(line string)
+type Config struct {
+    // ...
+    OnOutput OutputLineCallback
+}
+```
+
+### 11.2 Data Flow
+
+```
+powershell.exe
+    │
+    ├─ stdout ──→ bufio.Scanner ──→ readResponse()
+    │                                  │
+    │                    (non-marker lines)
+    │                                  │
+    │                                  ▼
+    │                            emitOutput(line)
+    │                                  │
+    ├─ stderr ──→ drainStderr() goroutine ─┘
+    │
+    ▼
+liveOutputCh (chan string, 256-buffered)
+    │
+    ├─ LiveOutput() → caller goroutine reads
+    └─ onOutput callback → synchronous notification
+```
+
+### 11.3 `drainStderr()`
+
+A background goroutine launched during `start()` continuously reads stderr and forwards every line to the shared `liveOutputCh`. If the channel is full, lines are silently dropped to avoid blocking the runner.
+
+### 11.4 `emitOutput()`
+
+Called from `readResponse()` for every stdout line that falls **outside** the `<<<PSADT_BEGIN>>>` / `<<<PSADT_END>>>` markers. This captures PSADT log output (Write-ADTLogEntry, Write-Host, etc.) in real time.
+
+### 11.5 Usage Pattern (RMM Agent)
+
+```go
+// Start streaming goroutine
+liveCh := session.LiveOutput()
+go func() {
+    for line := range liveCh {
+        fmt.Printf("[PSADT] %s\n", line)
+    }
+}()
+
+// Run a long installation — logs stream in real time
+session.StartMsiProcess(types.MsiProcessOptions{
+    Action:   types.MsiInstall,
+    FilePath: "setup.msi",
+})
+// The channel closes when client.Close() is called
+```
+
+---
+
+## 12. Type System
+
+### 12.1 Struct Tags
 
 The type system uses **two** struct tag families:
 
@@ -579,7 +749,7 @@ The type system uses **two** struct tag families:
 
 Many structs have **both** tags on the same field (bidirectional types used as both input and output), but most separate input structs (`XxxOptions`) from output structs (`XxxResult`, `XxxInfo`).
 
-### 10.2 Input Structs (Options)
+### 12.2 Input Structs (Options)
 
 Pattern: all-optional fields, zero values are omitted from the command.
 
@@ -595,7 +765,7 @@ type StartProcessOptions struct {
 }
 ```
 
-### 10.3 Output Structs (Results/Info)
+### 12.3 Output Structs (Results/Info)
 
 Pattern: JSON tags matching PSADT's PowerShell output property names.
 
@@ -609,7 +779,7 @@ type ProcessResult struct {
 }
 ```
 
-### 10.4 Enums as Typed Strings
+### 12.4 Enums as Typed Strings
 
 PSADT parameters that accept a fixed set of values are typed as Go string aliases:
 
@@ -624,7 +794,7 @@ const (
 
 This provides IDE autocompletion and compile-time validation without runtime overhead. The `cmdbuilder` formats them as quoted strings.
 
-### 10.5 `EnvironmentInfo` — Hierarchical Snapshot
+### 12.5 `EnvironmentInfo` — Hierarchical Snapshot
 
 `Client.GetEnvironment()` returns a single `types.EnvironmentInfo` that aggregates ~90 PSADT variables into a structured hierarchy:
 
@@ -641,11 +811,11 @@ type EnvironmentInfo struct {
 }
 ```
 
-This is built by a single `Get-Variable` sweep in `environment.go` rather than 90 individual `Execute` calls.
+Built by a single PowerShell hashtable serialization in `environment.go` rather than 90 individual `Execute` calls. The result is **cached** after the first call; `InvalidateEnvCache()` forces a refresh.
 
 ---
 
-## 11. Concurrency Model
+## 13. Concurrency Model
 
 ```
 Goroutine A          Goroutine B
@@ -676,7 +846,7 @@ runner.Execute()    runner.Execute()
 
 ---
 
-## 12. Error Handling Chain
+## 14. Error Handling Chain
 
 ```
 PSADT throws a terminating error in PowerShell
@@ -715,7 +885,7 @@ Go caller can:
 
 ---
 
-## 13. Build Constraints and Platform Scope
+## 15. Build Constraints and Platform Scope
 
 Every `.go` file in the library (except `go.mod`) carries:
 
@@ -732,7 +902,7 @@ The `examples/` programs also carry the constraint. There are no `_test.go` file
 
 ---
 
-## 14. Design Decisions
+## 16. Design Decisions
 
 ### D1 — Persistent process over per-command invocation
 
@@ -761,3 +931,15 @@ The outer `Response{Success, Data, Error}` envelope is parsed eagerly to determi
 ### D7 — `types/` as a zero-dependency leaf package
 
 Keeping all public types in a separate package with no internal imports allows consumers to import only `types/` for struct definitions (e.g., in shared configuration code) without pulling in the process management infrastructure.
+
+### D8 — Embedded context over method duplication
+
+Adding an explicit `ctx` parameter to every session method would double the API surface (~200 methods). Instead, the `Session` struct carries an optional embedded context field set by `WithContext()`. A single `getContext()` helper resolves the effective context for every call: the session's embedded context if present, otherwise the client's default timeout. This provides fine-grained deadline/cancellation control at zero duplication cost.
+
+### D9 — Buffered channel + dual-source live output
+
+Live output streaming merges two sources — stdout (non-marker lines from `readResponse`) and stderr (`drainStderr` goroutine) — into a single buffered channel. The 256-line buffer prevents the PS process from blocking on write while the consumer reads. An optional synchronous `OnOutput` callback runs in the same goroutine as the scanner/stderr reader, suitable for write-through logging. The channel is closed on `Stop()`, providing a clean termination signal for consumer goroutines.
+
+### D10 — Batch execution over individual calls
+
+Joining multiple PS commands with `; ` and wrapping them once under a single `try/catch` reduces round-trips for multi-step operations (e.g., validation: check app name + version + network in one call). The trade-off is that error handling is all-or-nothing — a failure in any command aborts the batch. For critical sequences, separate `Execute` calls remain the safer option.
