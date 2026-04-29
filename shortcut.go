@@ -12,7 +12,7 @@ import (
 
 // NewShortcut creates a new shortcut.
 func (s *Session) NewShortcut(opts types.NewShortcutOptions) error {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := cmdbuilder.Build("New-ADTShortcut", opts)
 	return s.executeVoid(ctx, cmd)
@@ -20,7 +20,7 @@ func (s *Session) NewShortcut(opts types.NewShortcutOptions) error {
 
 // SetShortcut modifies an existing shortcut.
 func (s *Session) SetShortcut(opts types.SetShortcutOptions) error {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := cmdbuilder.Build("Set-ADTShortcut", opts)
 	return s.executeVoid(ctx, cmd)
@@ -28,7 +28,7 @@ func (s *Session) SetShortcut(opts types.SetShortcutOptions) error {
 
 // GetShortcut retrieves information about a shortcut.
 func (s *Session) GetShortcut(path string) (*types.ShortcutInfo, error) {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := fmt.Sprintf("Get-ADTShortcut -Path %s", cmdbuilder.EscapeString(path))
 	data, err := s.execute(ctx, cmd)

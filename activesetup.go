@@ -9,7 +9,7 @@ import (
 
 // SetActiveSetup creates or modifies an Active Setup registry entry.
 func (s *Session) SetActiveSetup(opts types.ActiveSetupOptions) error {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := cmdbuilder.Build("Set-ADTActiveSetup", opts)
 	return s.executeVoid(ctx, cmd)

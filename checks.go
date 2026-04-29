@@ -12,7 +12,7 @@ import (
 
 // TestBattery tests if the system is running on battery power.
 func (s *Session) TestBattery() (*types.BatteryInfo, error) {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	data, err := s.execute(ctx, "Test-ADTBattery")
 	if err != nil {
@@ -27,7 +27,7 @@ func (s *Session) TestBattery() (*types.BatteryInfo, error) {
 
 // TestCallerIsAdmin checks if the current user has admin privileges.
 func (s *Session) TestCallerIsAdmin() (bool, error) {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	data, err := s.execute(ctx, "Test-ADTCallerIsAdmin")
 	if err != nil {
@@ -38,7 +38,7 @@ func (s *Session) TestCallerIsAdmin() (bool, error) {
 
 // TestNetworkConnection checks if there is an active network connection.
 func (s *Session) TestNetworkConnection() (bool, error) {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	data, err := s.execute(ctx, "Test-ADTNetworkConnection")
 	if err != nil {
@@ -49,7 +49,7 @@ func (s *Session) TestNetworkConnection() (bool, error) {
 
 // TestMutexAvailability tests if a named mutex is available.
 func (s *Session) TestMutexAvailability(mutexName string) (bool, error) {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := fmt.Sprintf("Test-ADTMutexAvailability -MutexName %s", cmdbuilder.EscapeString(mutexName))
 	data, err := s.execute(ctx, cmd)
@@ -61,7 +61,7 @@ func (s *Session) TestMutexAvailability(mutexName string) (bool, error) {
 
 // TestPowerPoint checks if PowerPoint is running in presentation mode.
 func (s *Session) TestPowerPoint() (bool, error) {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	data, err := s.execute(ctx, "Test-ADTPowerPoint")
 	if err != nil {
@@ -72,7 +72,7 @@ func (s *Session) TestPowerPoint() (bool, error) {
 
 // TestMicrophoneInUse checks if a microphone is currently in use.
 func (s *Session) TestMicrophoneInUse() (bool, error) {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	data, err := s.execute(ctx, "Test-ADTMicrophoneInUse")
 	if err != nil {
@@ -83,7 +83,7 @@ func (s *Session) TestMicrophoneInUse() (bool, error) {
 
 // TestUserIsBusy checks if the user is busy (presentation mode, microphone in use, etc.).
 func (s *Session) TestUserIsBusy() (bool, error) {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	data, err := s.execute(ctx, "Test-ADTUserIsBusy")
 	if err != nil {
@@ -94,7 +94,7 @@ func (s *Session) TestUserIsBusy() (bool, error) {
 
 // TestEspActive checks if the Enrollment Status Page is active.
 func (s *Session) TestEspActive() (bool, error) {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	data, err := s.execute(ctx, "Test-ADTEspActive")
 	if err != nil {
@@ -105,7 +105,7 @@ func (s *Session) TestEspActive() (bool, error) {
 
 // TestOobeCompleted checks if the Out-Of-Box Experience has been completed.
 func (s *Session) TestOobeCompleted() (bool, error) {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	data, err := s.execute(ctx, "Test-ADTOobeCompleted")
 	if err != nil {
@@ -114,11 +114,13 @@ func (s *Session) TestOobeCompleted() (bool, error) {
 	return parser.ParseBool(data)
 }
 
-// TestMSUpdates checks if Microsoft Updates are available.
-func (s *Session) TestMSUpdates() (bool, error) {
-	ctx, cancel := s.client.defaultContext()
+// TestMSUpdates checks if a specific Microsoft Update (KB) is installed.
+// The kbNumber must be in the format 'KB1234567'.
+func (s *Session) TestMSUpdates(kbNumber string) (bool, error) {
+	ctx, cancel := s.getContext()
 	defer cancel()
-	data, err := s.execute(ctx, "Test-ADTMSUpdates")
+	cmd := fmt.Sprintf("Test-ADTMSUpdates -KbNumber %s", cmdbuilder.EscapeString(kbNumber))
+	data, err := s.execute(ctx, cmd)
 	if err != nil {
 		return false, err
 	}

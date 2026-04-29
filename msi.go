@@ -12,7 +12,7 @@ import (
 
 // GetMsiExitCodeMessage gets the message for an MSI exit code.
 func (s *Session) GetMsiExitCodeMessage(exitCode int) (string, error) {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := fmt.Sprintf("Get-ADTMsiExitCodeMessage -MsiExitCode %d", exitCode)
 	data, err := s.execute(ctx, cmd)
@@ -24,7 +24,7 @@ func (s *Session) GetMsiExitCodeMessage(exitCode int) (string, error) {
 
 // GetMsiTableProperty gets properties from an MSI database table.
 func (s *Session) GetMsiTableProperty(opts types.MsiTableOptions) (map[string]string, error) {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := cmdbuilder.Build("Get-ADTMsiTableProperty", opts)
 	data, err := s.execute(ctx, cmd)
@@ -40,7 +40,7 @@ func (s *Session) GetMsiTableProperty(opts types.MsiTableOptions) (map[string]st
 
 // SetMsiProperty sets a property in an MSI database.
 func (s *Session) SetMsiProperty(opts types.SetMsiPropertyOptions) error {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := cmdbuilder.Build("Set-ADTMsiProperty", opts)
 	return s.executeVoid(ctx, cmd)
@@ -48,7 +48,7 @@ func (s *Session) SetMsiProperty(opts types.SetMsiPropertyOptions) error {
 
 // NewMsiTransform creates a new MSI transform file.
 func (s *Session) NewMsiTransform(opts types.MsiTransformOptions) error {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := cmdbuilder.Build("New-ADTMsiTransform", opts)
 	return s.executeVoid(ctx, cmd)

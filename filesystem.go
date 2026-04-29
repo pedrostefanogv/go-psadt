@@ -12,7 +12,7 @@ import (
 
 // CopyFile copies files from source to destination.
 func (s *Session) CopyFile(opts types.CopyFileOptions) error {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := cmdbuilder.Build("Copy-ADTFile", opts)
 	return s.executeVoid(ctx, cmd)
@@ -20,7 +20,7 @@ func (s *Session) CopyFile(opts types.CopyFileOptions) error {
 
 // CopyFileToUserProfiles copies files to all user profiles.
 func (s *Session) CopyFileToUserProfiles(opts types.CopyFileToUserProfilesOptions) error {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := cmdbuilder.Build("Copy-ADTFileToUserProfiles", opts)
 	return s.executeVoid(ctx, cmd)
@@ -28,7 +28,7 @@ func (s *Session) CopyFileToUserProfiles(opts types.CopyFileToUserProfilesOption
 
 // RemoveFile removes files.
 func (s *Session) RemoveFile(opts types.RemoveFileOptions) error {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := cmdbuilder.Build("Remove-ADTFile", opts)
 	return s.executeVoid(ctx, cmd)
@@ -36,7 +36,7 @@ func (s *Session) RemoveFile(opts types.RemoveFileOptions) error {
 
 // RemoveFileFromUserProfiles removes files from all user profiles.
 func (s *Session) RemoveFileFromUserProfiles(opts types.RemoveFileFromUserProfilesOptions) error {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := cmdbuilder.Build("Remove-ADTFileFromUserProfiles", opts)
 	return s.executeVoid(ctx, cmd)
@@ -44,7 +44,7 @@ func (s *Session) RemoveFileFromUserProfiles(opts types.RemoveFileFromUserProfil
 
 // NewFolder creates a new folder.
 func (s *Session) NewFolder(path string) error {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := fmt.Sprintf("New-ADTFolder -Path %s", cmdbuilder.EscapeString(path))
 	return s.executeVoid(ctx, cmd)
@@ -52,7 +52,7 @@ func (s *Session) NewFolder(path string) error {
 
 // RemoveFolder removes a folder.
 func (s *Session) RemoveFolder(opts types.RemoveFolderOptions) error {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := cmdbuilder.Build("Remove-ADTFolder", opts)
 	return s.executeVoid(ctx, cmd)
@@ -60,7 +60,7 @@ func (s *Session) RemoveFolder(opts types.RemoveFolderOptions) error {
 
 // CopyContentToCache copies content to the PSADT cache directory.
 func (s *Session) CopyContentToCache(opts types.CopyContentToCacheOptions) (string, error) {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := cmdbuilder.Build("Copy-ADTContentToCache", opts)
 	data, err := s.execute(ctx, cmd)
@@ -72,7 +72,7 @@ func (s *Session) CopyContentToCache(opts types.CopyContentToCacheOptions) (stri
 
 // RemoveContentFromCache removes content from the PSADT cache directory.
 func (s *Session) RemoveContentFromCache(opts types.RemoveContentFromCacheOptions) error {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := cmdbuilder.Build("Remove-ADTContentFromCache", opts)
 	return s.executeVoid(ctx, cmd)

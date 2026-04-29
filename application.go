@@ -10,7 +10,7 @@ import (
 
 // GetApplication searches for installed applications matching the criteria.
 func (s *Session) GetApplication(opts types.GetApplicationOptions) ([]types.InstalledApplication, error) {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := cmdbuilder.Build("Get-ADTApplication", opts)
 	data, err := s.execute(ctx, cmd)
@@ -26,7 +26,7 @@ func (s *Session) GetApplication(opts types.GetApplicationOptions) ([]types.Inst
 
 // UninstallApplication uninstalls applications matching the criteria.
 func (s *Session) UninstallApplication(opts types.UninstallApplicationOptions) error {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := cmdbuilder.Build("Uninstall-ADTApplication", opts)
 	return s.executeVoid(ctx, cmd)

@@ -12,7 +12,7 @@ import (
 
 // SendKeys sends keystrokes to a window.
 func (s *Session) SendKeys(opts types.SendKeysOptions) error {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := cmdbuilder.Build("Send-ADTKeys", opts)
 	return s.executeVoid(ctx, cmd)
@@ -20,7 +20,7 @@ func (s *Session) SendKeys(opts types.SendKeysOptions) error {
 
 // ConvertToNTAccountOrSID converts between NTAccount and SID formats.
 func (s *Session) ConvertToNTAccountOrSID(identity string, toSID bool) (string, error) {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := fmt.Sprintf("Convert-ADTToNTAccountOrSID -Identity %s", cmdbuilder.EscapeString(identity))
 	if toSID {
@@ -35,7 +35,7 @@ func (s *Session) ConvertToNTAccountOrSID(identity string, toSID bool) (string, 
 
 // SetItemPermission sets permissions on a file or folder.
 func (s *Session) SetItemPermission(opts types.ItemPermissionOptions) error {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := cmdbuilder.Build("Set-ADTItemPermission", opts)
 	return s.executeVoid(ctx, cmd)
@@ -43,7 +43,7 @@ func (s *Session) SetItemPermission(opts types.ItemPermissionOptions) error {
 
 // InvokeCommandWithRetries invokes a command with retry logic.
 func (s *Session) InvokeCommandWithRetries(scriptBlock string, opts ...types.RetryOptions) error {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := fmt.Sprintf("Invoke-ADTCommandWithRetries -ScriptBlock %s", cmdbuilder.FormatScriptBlock(scriptBlock))
 	if len(opts) > 0 {
@@ -57,7 +57,7 @@ func (s *Session) InvokeCommandWithRetries(scriptBlock string, opts ...types.Ret
 
 // GetUniversalDate gets a date/time string formatted for the current culture.
 func (s *Session) GetUniversalDate(dateTime ...string) (string, error) {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := "Get-ADTUniversalDate"
 	if len(dateTime) > 0 && dateTime[0] != "" {
@@ -72,7 +72,7 @@ func (s *Session) GetUniversalDate(dateTime ...string) (string, error) {
 
 // RemoveInvalidFileNameChars removes invalid characters from a filename.
 func (s *Session) RemoveInvalidFileNameChars(name string) (string, error) {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := fmt.Sprintf("Remove-ADTInvalidFileNameChars -Name %s", cmdbuilder.EscapeString(name))
 	data, err := s.execute(ctx, cmd)
@@ -84,7 +84,7 @@ func (s *Session) RemoveInvalidFileNameChars(name string) (string, error) {
 
 // OutPowerShellEncodedCommand encodes a PowerShell command to Base64.
 func (s *Session) OutPowerShellEncodedCommand(scriptBlock string) (string, error) {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := fmt.Sprintf("Out-ADTPowerShellEncodedCommand -ScriptBlock %s", cmdbuilder.FormatScriptBlock(scriptBlock))
 	data, err := s.execute(ctx, cmd)
@@ -96,7 +96,7 @@ func (s *Session) OutPowerShellEncodedCommand(scriptBlock string) (string, error
 
 // NewTemplate creates a new PSADT template in a target directory.
 func (s *Session) NewTemplate(destination string) error {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := fmt.Sprintf("New-ADTTemplate -Destination %s", cmdbuilder.EscapeString(destination))
 	return s.executeVoid(ctx, cmd)

@@ -148,3 +148,16 @@ func FormatScriptBlock(script string) string {
 	}
 	return fmt.Sprintf("{%s}", script)
 }
+
+// FormatHashtableGeneric formats a map[string]string as a PowerShell hashtable literal.
+// Used for passthrough scenarios like Set-ADTIniSection -Values.
+func FormatHashtableGeneric(values map[string]string) string {
+	if len(values) == 0 {
+		return "@{}"
+	}
+	pairs := make([]string, 0, len(values))
+	for k, v := range values {
+		pairs = append(pairs, fmt.Sprintf("%s=%s", EscapeString(k), EscapeString(v)))
+	}
+	return fmt.Sprintf("@{%s}", strings.Join(pairs, "; "))
+}

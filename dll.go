@@ -11,7 +11,7 @@ import (
 
 // RegisterDll registers a DLL file.
 func (s *Session) RegisterDll(filePath string) error {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := fmt.Sprintf("Register-ADTDll -FilePath %s", cmdbuilder.EscapeString(filePath))
 	return s.executeVoid(ctx, cmd)
@@ -19,7 +19,7 @@ func (s *Session) RegisterDll(filePath string) error {
 
 // UnregisterDll unregisters a DLL file.
 func (s *Session) UnregisterDll(filePath string) error {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := fmt.Sprintf("Unregister-ADTDll -FilePath %s", cmdbuilder.EscapeString(filePath))
 	return s.executeVoid(ctx, cmd)
@@ -27,7 +27,7 @@ func (s *Session) UnregisterDll(filePath string) error {
 
 // InvokeRegSvr32 invokes regsvr32.exe with the specified options.
 func (s *Session) InvokeRegSvr32(opts types.RegSvr32Options) error {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := cmdbuilder.Build("Invoke-ADTRegSvr32", opts)
 	return s.executeVoid(ctx, cmd)

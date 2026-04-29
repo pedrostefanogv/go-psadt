@@ -11,9 +11,11 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/pedrostefanogv/go-psadt/internal/runner"
+	"github.com/pedrostefanogv/go-psadt/types"
 )
 
 const (
@@ -29,6 +31,10 @@ type Client struct {
 	moduleName string
 	minVersion string
 	timeout    time.Duration
+
+	envMu     sync.Mutex
+	envCache  *types.EnvironmentInfo
+	envCached bool
 }
 
 // Option configures a Client.
@@ -151,7 +157,49 @@ func (c *Client) IsAlive() bool {
 	return c.runner.IsAlive()
 }
 
+// Reconnect attempts to restart the PowerShell runner if it has died.
+// Returns the new client state after reconnection attempt.
+func (c *Client) Reconnect(ctx context.Context) error {
+	if c.runner != nil {
+		c.runner.Stop()
+	}
+
+	cfg := runner.Config{
+		Timeout: c.timeout,
+	}
+
+	r, err := runner.New(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to restart PowerShell runner: %w", err)
+	}
+
+	c.runner = r
+
+	// Re-import module
+	if err := r.ImportModule(ctx, c.moduleName); err != nil {
+		c.runner = nil
+		return fmt.Errorf("failed to re-import module %s: %w", c.moduleName, err)
+	}
+
+	c.logger.Info("PSADT client reconnected")
+	return nil
+}
+
+// Runner returns the underlying runner (useful for diagnostics).
+func (c *Client) Runner() *runner.Runner {
+	return c.runner
+}
+
 // defaultContext returns a context with the client's default timeout.
 func (c *Client) defaultContext() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), c.timeout)
+}
+
+// InvalidateEnvCache clears the cached environment data so the next call to
+// GetEnvironment will fetch fresh data from the PowerShell runner.
+func (c *Client) InvalidateEnvCache() {
+	c.envMu.Lock()
+	c.envCached = false
+	c.envCache = nil
+	c.envMu.Unlock()
 }

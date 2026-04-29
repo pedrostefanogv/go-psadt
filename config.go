@@ -12,7 +12,7 @@ import (
 
 // GetConfig retrieves the current PSADT configuration.
 func (s *Session) GetConfig() (*types.ADTConfig, error) {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	data, err := s.execute(ctx, "Get-ADTConfig")
 	if err != nil {
@@ -27,7 +27,7 @@ func (s *Session) GetConfig() (*types.ADTConfig, error) {
 
 // GetStringTable retrieves the current PSADT string table.
 func (s *Session) GetStringTable() (*types.ADTStringTable, error) {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	data, err := s.execute(ctx, "Get-ADTStringTable")
 	if err != nil {
@@ -42,7 +42,7 @@ func (s *Session) GetStringTable() (*types.ADTStringTable, error) {
 
 // GetDeferHistory retrieves the defer history for the current deployment.
 func (s *Session) GetDeferHistory() (*types.DeferHistory, error) {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	data, err := s.execute(ctx, "Get-ADTDeferHistory")
 	if err != nil {
@@ -57,7 +57,7 @@ func (s *Session) GetDeferHistory() (*types.DeferHistory, error) {
 
 // SetDeferHistory sets the defer history for the current deployment.
 func (s *Session) SetDeferHistory(opts types.DeferHistory) error {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := cmdbuilder.Build("Set-ADTDeferHistory", opts)
 	return s.executeVoid(ctx, cmd)
@@ -65,14 +65,14 @@ func (s *Session) SetDeferHistory(opts types.DeferHistory) error {
 
 // ResetDeferHistory resets the defer history for the current deployment.
 func (s *Session) ResetDeferHistory() error {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	return s.executeVoid(ctx, "Reset-ADTDeferHistory")
 }
 
 // SetPowerShellCulture sets the PowerShell culture for the current session.
 func (s *Session) SetPowerShellCulture(cultureName string) error {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := fmt.Sprintf("Set-ADTPowerShellCulture -CultureName %s", cmdbuilder.EscapeString(cultureName))
 	return s.executeVoid(ctx, cmd)

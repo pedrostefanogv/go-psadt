@@ -10,7 +10,7 @@ import (
 
 // MountWimFile mounts a WIM file.
 func (s *Session) MountWimFile(opts types.MountWimOptions) (string, error) {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := cmdbuilder.Build("Mount-ADTWimFile", opts)
 	data, err := s.execute(ctx, cmd)
@@ -22,7 +22,7 @@ func (s *Session) MountWimFile(opts types.MountWimOptions) (string, error) {
 
 // DismountWimFile dismounts a WIM file.
 func (s *Session) DismountWimFile(opts types.DismountWimOptions) error {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := cmdbuilder.Build("Dismount-ADTWimFile", opts)
 	return s.executeVoid(ctx, cmd)
@@ -30,7 +30,7 @@ func (s *Session) DismountWimFile(opts types.DismountWimOptions) error {
 
 // NewZipFile creates a new ZIP archive.
 func (s *Session) NewZipFile(opts types.NewZipOptions) error {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := cmdbuilder.Build("New-ADTZipFile", opts)
 	return s.executeVoid(ctx, cmd)

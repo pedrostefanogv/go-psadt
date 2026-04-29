@@ -12,7 +12,8 @@ import (
 
 // GetEnvironment collects all PSADT environment variables and returns them
 // as a structured EnvironmentInfo. This works at the Client level and does
-// not require an open session.
+// not require an open session. Results are cached after first call; call
+// InvalidateEnvCache() to force fresh data.
 func (c *Client) GetEnvironment() (*types.EnvironmentInfo, error) {
 	ctx, cancel := c.defaultContext()
 	defer cancel()
@@ -21,6 +22,14 @@ func (c *Client) GetEnvironment() (*types.EnvironmentInfo, error) {
 
 // GetEnvironmentWithContext collects environment variables with an explicit context.
 func (c *Client) GetEnvironmentWithContext(ctx context.Context) (*types.EnvironmentInfo, error) {
+	c.envMu.Lock()
+	if c.envCached && c.envCache != nil {
+		env := c.envCache
+		c.envMu.Unlock()
+		return env, nil
+	}
+	c.envMu.Unlock()
+
 	// Build a PS command that collects all PSADT env vars into a structured hashtable
 	cmd := `
 @{
@@ -154,5 +163,28 @@ func (c *Client) GetEnvironmentWithContext(ctx context.Context) (*types.Environm
 		return nil, err
 	}
 
+	// Cache the result
+	c.envMu.Lock()
+	c.envCache = &env
+	c.envCached = true
+	c.envMu.Unlock()
+
 	return &env, nil
+}
+
+// ExecuteRawScript executes an arbitrary PowerShell script block within the
+// PSADT session. The script runs in the same persistent runner, inheriting
+// the module context (session, variables, etc.). Returns raw JSON bytes.
+//
+// This is the escape hatch for RMM agents that need to run custom PSADT
+// PowerShell logic not yet wrapped by the Go API.
+func (c *Client) ExecuteRawScript(ctx context.Context, script string) ([]byte, error) {
+	c.logger.Debug("executing raw script", "length", len(script))
+	return c.runner.ExecuteRaw(ctx, script)
+}
+
+// ExecuteRawVoidScript is like ExecuteRawScript but for scripts with no return value.
+func (c *Client) ExecuteRawVoidScript(ctx context.Context, script string) error {
+	c.logger.Debug("executing raw void script", "length", len(script))
+	return c.runner.ExecuteRawVoid(ctx, script)
 }

@@ -9,7 +9,7 @@ import (
 
 // WriteLogEntry writes an entry to the PSADT log file.
 func (s *Session) WriteLogEntry(opts types.LogEntryOptions) error {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := cmdbuilder.Build("Write-ADTLogEntry", opts)
 	return s.executeVoid(ctx, cmd)

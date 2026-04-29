@@ -11,7 +11,7 @@ import (
 
 // AddEdgeExtension adds a Microsoft Edge extension via registry policy.
 func (s *Session) AddEdgeExtension(opts types.EdgeExtensionOptions) error {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := cmdbuilder.Build("Add-ADTEdgeExtension", opts)
 	return s.executeVoid(ctx, cmd)
@@ -19,7 +19,7 @@ func (s *Session) AddEdgeExtension(opts types.EdgeExtensionOptions) error {
 
 // RemoveEdgeExtension removes a Microsoft Edge extension policy.
 func (s *Session) RemoveEdgeExtension(extensionID string) error {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := fmt.Sprintf("Remove-ADTEdgeExtension -ExtensionID %s", cmdbuilder.EscapeString(extensionID))
 	return s.executeVoid(ctx, cmd)

@@ -21,7 +21,32 @@ func (r *Runner) ExecuteVoid(ctx context.Context, psCommand string) ([]byte, err
 	return r.executeWrapped(ctx, WrapVoidCommand(psCommand))
 }
 
-// ExecuteRaw sends a raw PowerShell command string (already wrapped) and reads the response.
+// ExecuteRaw runs an already-wrapped PowerShell command and returns the raw
+// JSON response bytes. The caller is responsible for providing properly wrapped
+// commands with markers. This is the escape hatch for custom scripting.
+func (r *Runner) ExecuteRaw(ctx context.Context, rawWrappedCmd string) ([]byte, error) {
+	return r.executeWrapped(ctx, rawWrappedCmd)
+}
+
+// ExecuteRawVoid runs an already-wrapped PowerShell command that produces
+// no meaningful data (e.g., void commands).
+func (r *Runner) ExecuteRawVoid(ctx context.Context, rawWrappedCmd string) error {
+	_, err := r.executeWrapped(ctx, rawWrappedCmd)
+	return err
+}
+
+// ExecuteBatch runs multiple PowerShell commands in a single round-trip.
+// All commands are joined with semicolons and wrapped once, reducing latency
+// for multi-step operations. Returns raw JSON response bytes.
+func (r *Runner) ExecuteBatch(ctx context.Context, commands []string) ([]byte, error) {
+	if len(commands) == 0 {
+		return nil, nil
+	}
+	joined := strings.Join(commands, "; ")
+	return r.executeWrapped(ctx, WrapCommand(joined))
+}
+
+// executeWrapped sends a raw PowerShell command string (already wrapped) and reads the response.
 func (r *Runner) executeWrapped(ctx context.Context, wrappedCmd string) ([]byte, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -115,7 +140,24 @@ func (r *Runner) readResponse(ctx context.Context) ([]byte, error) {
 
 			if inResponse {
 				jsonLines = append(jsonLines, line)
+			} else {
+				// Forward non-marker lines to live output stream
+				r.emitOutput(line)
 			}
 		}
+	}
+}
+
+// emitOutput sends a line to both the live output channel and the OnOutput callback.
+func (r *Runner) emitOutput(line string) {
+	if line == "" {
+		return
+	}
+	select {
+	case r.liveOutputCh <- line:
+	default:
+	}
+	if r.onOutput != nil {
+		r.onOutput(line)
 	}
 }

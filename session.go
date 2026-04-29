@@ -15,11 +15,35 @@ import (
 
 // Session represents an open ADT deployment session.
 // All PSADT function calls are made through a Session.
+//
+// Context propagation: every method uses the session's embedded context
+// (if set via WithContext) or the Client's default timeout. This means
+// callers can control deadlines/cancellation for an entire sequence of
+// operations without passing ctx to each method individually.
 type Session struct {
 	client *Client
 	runner *runner.Runner
 	config types.SessionConfig
+	ctx    context.Context // embedded context; nil means use default
 	closed bool
+}
+
+// WithContext returns a shallow copy of the session that uses the given
+// context for all subsequent method calls. The original session is not
+// modified. This allows callers to set a deadline or cancellation for
+// a group of operations without modifying every call site.
+//
+//	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+//	defer cancel()
+//	results, err := session.WithContext(ctx).GetApplication(opts)
+func (s *Session) WithContext(ctx context.Context) *Session {
+	return &Session{
+		client: s.client,
+		runner: s.runner,
+		config: s.config,
+		ctx:    ctx,
+		closed: s.closed,
+	}
 }
 
 // OpenSession opens a new ADT deployment session with the given configuration.
@@ -58,7 +82,7 @@ func (c *Client) OpenSessionWithContext(ctx context.Context, cfg types.SessionCo
 // Close closes the ADT session with the specified exit code.
 // This calls Close-ADTSession in PowerShell.
 func (s *Session) Close(exitCode int) error {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	return s.CloseWithContext(ctx, exitCode)
 }
@@ -100,7 +124,7 @@ func isExpectedSessionCloseRunnerTermination(err error) bool {
 // GetProperties returns the current session properties.
 // This calls Get-ADTSession in PowerShell.
 func (s *Session) GetProperties() (*types.SessionProperties, error) {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	return s.GetPropertiesWithContext(ctx)
 }
@@ -136,4 +160,21 @@ func (s *Session) executeVoid(ctx context.Context, cmd string) error {
 		return err
 	}
 	return parser.CheckSuccess(data)
+}
+
+// getContext returns the session's embedded context if set, otherwise the
+// client's default context. This is the central context resolution point
+// used by all session methods.
+func (s *Session) getContext() (context.Context, context.CancelFunc) {
+	if s.ctx != nil {
+		return context.WithCancel(s.ctx)
+	}
+	return s.getContext()
+}
+
+// LiveOutput returns a channel that receives live stdout/stderr lines from
+// the PowerShell process in real time. Use this to stream PSADT log output
+// during long operations (e.g., installation progress).
+func (s *Session) LiveOutput() <-chan string {
+	return s.runner.LiveOutput()
 }

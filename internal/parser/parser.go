@@ -139,6 +139,29 @@ func ParseUint64(data []byte) (uint64, error) {
 	return result, nil
 }
 
+// ParseUint32 parses a Response that returns a uint32 value (e.g., DWord registry value).
+func ParseUint32(data []byte) (uint32, error) {
+	resp, err := Parse(data)
+	if err != nil {
+		return 0, err
+	}
+
+	if !resp.Success {
+		return 0, NewPSADTError(resp.Error)
+	}
+
+	if len(resp.Data) == 0 || string(resp.Data) == "null" {
+		return 0, nil
+	}
+
+	var result uint32
+	if err := json.Unmarshal(resp.Data, &result); err != nil {
+		return 0, fmt.Errorf("failed to parse uint32 response: %w", err)
+	}
+
+	return result, nil
+}
+
 // CheckSuccess parses a response and only checks for success (no data extraction).
 func CheckSuccess(data []byte) error {
 	resp, err := Parse(data)

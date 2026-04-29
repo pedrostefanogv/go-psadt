@@ -12,7 +12,7 @@ import (
 
 // GetEnvironmentVariable gets an environment variable value.
 func (s *Session) GetEnvironmentVariable(variable string, target ...types.EnvironmentVariableTarget) (string, error) {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := fmt.Sprintf("Get-ADTEnvironmentVariable -Variable %s", cmdbuilder.EscapeString(variable))
 	if len(target) > 0 && target[0] != "" {
@@ -27,7 +27,7 @@ func (s *Session) GetEnvironmentVariable(variable string, target ...types.Enviro
 
 // SetEnvironmentVariable sets an environment variable.
 func (s *Session) SetEnvironmentVariable(variable, value string, target ...types.EnvironmentVariableTarget) error {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := fmt.Sprintf("Set-ADTEnvironmentVariable -Variable %s -Value %s",
 		cmdbuilder.EscapeString(variable),
@@ -40,7 +40,7 @@ func (s *Session) SetEnvironmentVariable(variable, value string, target ...types
 
 // RemoveEnvironmentVariable removes an environment variable.
 func (s *Session) RemoveEnvironmentVariable(variable string, target ...types.EnvironmentVariableTarget) error {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := fmt.Sprintf("Remove-ADTEnvironmentVariable -Variable %s", cmdbuilder.EscapeString(variable))
 	if len(target) > 0 && target[0] != "" {

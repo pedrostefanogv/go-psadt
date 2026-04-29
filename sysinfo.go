@@ -12,7 +12,7 @@ import (
 
 // GetLoggedOnUser gets the list of logged-on users.
 func (s *Session) GetLoggedOnUser() ([]types.LoggedOnUser, error) {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	data, err := s.execute(ctx, "Get-ADTLoggedOnUser")
 	if err != nil {
@@ -27,7 +27,7 @@ func (s *Session) GetLoggedOnUser() ([]types.LoggedOnUser, error) {
 
 // GetFreeDiskSpace gets the free disk space in MB.
 func (s *Session) GetFreeDiskSpace(drive ...string) (uint64, error) {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := "Get-ADTFreeDiskSpace"
 	if len(drive) > 0 && drive[0] != "" {
@@ -42,7 +42,7 @@ func (s *Session) GetFreeDiskSpace(drive ...string) (uint64, error) {
 
 // GetPendingReboot checks for pending reboots.
 func (s *Session) GetPendingReboot() (*types.PendingRebootInfo, error) {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	data, err := s.execute(ctx, "Get-ADTPendingReboot")
 	if err != nil {
@@ -57,7 +57,7 @@ func (s *Session) GetPendingReboot() (*types.PendingRebootInfo, error) {
 
 // GetOperatingSystemInfo gets operating system information.
 func (s *Session) GetOperatingSystemInfo() (*types.OSInfo, error) {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	data, err := s.execute(ctx, "Get-ADTOperatingSystemInfo")
 	if err != nil {
@@ -72,7 +72,7 @@ func (s *Session) GetOperatingSystemInfo() (*types.OSInfo, error) {
 
 // GetUserProfiles gets user profiles on the system.
 func (s *Session) GetUserProfiles(opts ...types.UserProfileOptions) ([]types.UserProfile, error) {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	var cmd string
 	if len(opts) > 0 {
@@ -93,7 +93,7 @@ func (s *Session) GetUserProfiles(opts ...types.UserProfileOptions) ([]types.Use
 
 // GetFileVersion gets the version of a file.
 func (s *Session) GetFileVersion(filePath string) (string, error) {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := fmt.Sprintf("Get-ADTFileVersion -File %s", cmdbuilder.EscapeString(filePath))
 	data, err := s.execute(ctx, cmd)
@@ -105,7 +105,7 @@ func (s *Session) GetFileVersion(filePath string) (string, error) {
 
 // GetExecutableInfo gets detailed information about an executable.
 func (s *Session) GetExecutableInfo(filePath string) (*types.ExecutableInfo, error) {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := fmt.Sprintf("Get-ADTExecutableInfo -Path %s", cmdbuilder.EscapeString(filePath))
 	data, err := s.execute(ctx, cmd)
@@ -121,7 +121,7 @@ func (s *Session) GetExecutableInfo(filePath string) (*types.ExecutableInfo, err
 
 // GetPEFileArchitecture gets the architecture of a PE file (x86, x64, etc.).
 func (s *Session) GetPEFileArchitecture(filePath string) (string, error) {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := fmt.Sprintf("Get-ADTPEFileArchitecture -FilePath %s", cmdbuilder.EscapeString(filePath))
 	data, err := s.execute(ctx, cmd)
@@ -133,7 +133,7 @@ func (s *Session) GetPEFileArchitecture(filePath string) (string, error) {
 
 // GetWindowTitle gets windows matching a title pattern.
 func (s *Session) GetWindowTitle(opts types.GetWindowTitleOptions) ([]types.WindowTitle, error) {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := cmdbuilder.Build("Get-ADTWindowTitle", opts)
 	data, err := s.execute(ctx, cmd)
@@ -149,7 +149,7 @@ func (s *Session) GetWindowTitle(opts types.GetWindowTitleOptions) ([]types.Wind
 
 // GetPresentationSettingsEnabledUsers gets users with presentation settings enabled.
 func (s *Session) GetPresentationSettingsEnabledUsers() ([]string, error) {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	data, err := s.execute(ctx, "Get-ADTPresentationSettingsEnabledUsers")
 	if err != nil {
@@ -164,7 +164,7 @@ func (s *Session) GetPresentationSettingsEnabledUsers() ([]string, error) {
 
 // GetUserNotificationState gets the current user notification state.
 func (s *Session) GetUserNotificationState() (string, error) {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	data, err := s.execute(ctx, "Get-ADTUserNotificationState")
 	if err != nil {

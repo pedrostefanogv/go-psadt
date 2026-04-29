@@ -12,7 +12,7 @@ import (
 
 // ShowInstallationWelcome displays the installation welcome dialog.
 func (s *Session) ShowInstallationWelcome(opts types.WelcomeOptions) error {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	normalizedOpts, err := normalizeWelcomeOptions(opts)
 	if err != nil {
@@ -24,7 +24,7 @@ func (s *Session) ShowInstallationWelcome(opts types.WelcomeOptions) error {
 
 // ShowInstallationPrompt displays an installation prompt dialog and returns the user's response.
 func (s *Session) ShowInstallationPrompt(opts types.PromptOptions) (*types.PromptResult, error) {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	normalizedOpts, err := normalizePromptOptions(opts)
 	if err != nil {
@@ -44,7 +44,7 @@ func (s *Session) ShowInstallationPrompt(opts types.PromptOptions) (*types.Promp
 
 // ShowInstallationProgress displays or updates the installation progress dialog.
 func (s *Session) ShowInstallationProgress(opts types.ProgressOptions) error {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	normalizedOpts, err := normalizeProgressOptions(opts)
 	if err != nil {
@@ -56,14 +56,14 @@ func (s *Session) ShowInstallationProgress(opts types.ProgressOptions) error {
 
 // CloseInstallationProgress closes the installation progress dialog.
 func (s *Session) CloseInstallationProgress() error {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	return s.executeVoid(ctx, "Close-ADTInstallationProgress")
 }
 
 // ShowInstallationRestartPrompt displays a restart prompt dialog.
 func (s *Session) ShowInstallationRestartPrompt(opts types.RestartPromptOptions) error {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := cmdbuilder.Build("Show-ADTInstallationRestartPrompt", opts)
 	return s.executeVoid(ctx, cmd)
@@ -71,7 +71,7 @@ func (s *Session) ShowInstallationRestartPrompt(opts types.RestartPromptOptions)
 
 // ShowDialogBox displays a standard Windows dialog box and returns the result.
 func (s *Session) ShowDialogBox(opts types.DialogBoxOptions) (types.DialogBoxResult, error) {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	normalizedIcon, err := normalizeDialogBoxIcon(opts.Icon)
 	if err != nil {
@@ -146,7 +146,7 @@ func normalizeProgressOptions(opts types.ProgressOptions) (types.ProgressOptions
 
 // ShowBalloonTip displays a balloon tip / toast notification.
 func (s *Session) ShowBalloonTip(opts types.BalloonTipOptions) error {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := cmdbuilder.Build("Show-ADTBalloonTip", opts)
 	return s.executeVoid(ctx, cmd)
@@ -154,7 +154,7 @@ func (s *Session) ShowBalloonTip(opts types.BalloonTipOptions) error {
 
 // ShowHelpConsole displays the PSADT help console.
 func (s *Session) ShowHelpConsole() error {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	return s.executeVoid(ctx, "Show-ADTHelpConsole")
 }

@@ -11,7 +11,7 @@ import (
 
 // GetIniValue reads a value from an INI file.
 func (s *Session) GetIniValue(filePath, section, key string) (string, error) {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := fmt.Sprintf("Get-ADTIniValue -FilePath %s -Section %s -Key %s",
 		cmdbuilder.EscapeString(filePath),
@@ -26,7 +26,7 @@ func (s *Session) GetIniValue(filePath, section, key string) (string, error) {
 
 // SetIniValue writes a value to an INI file.
 func (s *Session) SetIniValue(filePath, section, key, value string) error {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := fmt.Sprintf("Set-ADTIniValue -FilePath %s -Section %s -Key %s -Value %s",
 		cmdbuilder.EscapeString(filePath),
@@ -38,7 +38,7 @@ func (s *Session) SetIniValue(filePath, section, key, value string) error {
 
 // RemoveIniValue removes a value from an INI file.
 func (s *Session) RemoveIniValue(filePath, section string, key ...string) error {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := fmt.Sprintf("Remove-ADTIniValue -FilePath %s -Section %s",
 		cmdbuilder.EscapeString(filePath),
@@ -51,7 +51,7 @@ func (s *Session) RemoveIniValue(filePath, section string, key ...string) error 
 
 // GetIniSection reads an entire section from an INI file.
 func (s *Session) GetIniSection(filePath, section string) (map[string]string, error) {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := fmt.Sprintf("Get-ADTIniSection -FilePath %s -Section %s",
 		cmdbuilder.EscapeString(filePath),
@@ -69,7 +69,7 @@ func (s *Session) GetIniSection(filePath, section string) (map[string]string, er
 
 // SetIniSection writes an entire section to an INI file.
 func (s *Session) SetIniSection(filePath, section string, content map[string]string) error {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	// Build a hashtable from the content map
 	pairs := ""
@@ -88,7 +88,7 @@ func (s *Session) SetIniSection(filePath, section string, content map[string]str
 
 // RemoveIniSection removes an entire section from an INI file.
 func (s *Session) RemoveIniSection(filePath, section string) error {
-	ctx, cancel := s.client.defaultContext()
+	ctx, cancel := s.getContext()
 	defer cancel()
 	cmd := fmt.Sprintf("Remove-ADTIniSection -FilePath %s -Section %s",
 		cmdbuilder.EscapeString(filePath),

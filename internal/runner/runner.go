@@ -18,6 +18,11 @@ const (
 	defaultModuleName = "PSAppDeployToolkit"
 )
 
+// OutputLineCallback is called for every stdout/stderr line that PowerShell emits
+// outside of the JSON response markers. Useful for streaming PSADT logs to an
+// RMM console or file in real time.
+type OutputLineCallback func(line string)
+
 // Config holds configuration for the PowerShell runner.
 type Config struct {
 	// PSPath is the path to the PowerShell executable.
@@ -29,6 +34,11 @@ type Config struct {
 
 	// UsePowerShell7 forces use of pwsh.exe instead of powershell.exe.
 	UsePowerShell7 bool
+
+	// OnOutput is called synchronously for each stdout/stderr line emitted
+	// by PowerShell outside of JSON response markers. Set this to stream
+	// PSADT log output to the caller in real time during long operations.
+	OnOutput OutputLineCallback
 }
 
 // Runner manages a persistent PowerShell process.
@@ -41,6 +51,14 @@ type Runner struct {
 	running       bool
 	timeout       time.Duration
 	psPath        string
+
+	// liveOutputCh receives every non-marker stdout/stderr line in real time.
+	// Callers can read from this channel to stream PSADT logs during long operations.
+	// The channel is closed when the runner stops.
+	liveOutputCh chan string
+
+	// onOutput is an optional synchronous callback for each output line.
+	onOutput func(line string)
 }
 
 // New creates and starts a new PowerShell runner.
@@ -56,8 +74,10 @@ func New(cfg Config) (*Runner, error) {
 	}
 
 	r := &Runner{
-		timeout: timeout,
-		psPath:  psPath,
+		timeout:      timeout,
+		psPath:       psPath,
+		onOutput:     cfg.OnOutput,
+		liveOutputCh: make(chan string, 256),
 	}
 
 	if err := r.start(); err != nil {
@@ -111,6 +131,9 @@ func (r *Runner) start() error {
 
 	r.running = true
 
+	// Start background stderr reader that feeds into liveOutputCh
+	go r.drainStderr()
+
 	// Set UTF-8 output encoding
 	_, err = fmt.Fprintln(r.stdin, "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8")
 	if err != nil {
@@ -128,6 +151,25 @@ func (r *Runner) start() error {
 	return nil
 }
 
+// drainStderr reads stderr continuously and forwards lines to liveOutputCh.
+func (r *Runner) drainStderr() {
+	if r.stderr == nil {
+		return
+	}
+	scanner := bufio.NewScanner(r.stderr)
+	for scanner.Scan() {
+		line := scanner.Text()
+		select {
+		case r.liveOutputCh <- line:
+		default:
+			// drop if channel full to avoid blocking the runner
+		}
+		if r.onOutput != nil {
+			r.onOutput(line)
+		}
+	}
+}
+
 // Stop gracefully stops the PowerShell process.
 func (r *Runner) Stop() error {
 	r.mu.Lock()
@@ -138,6 +180,9 @@ func (r *Runner) Stop() error {
 	}
 
 	r.running = false
+
+	// Close the live output channel
+	close(r.liveOutputCh)
 
 	// Send exit command
 	if r.stdin != nil {
@@ -166,6 +211,14 @@ func (r *Runner) IsAlive() bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.running
+}
+
+// LiveOutput returns a channel that receives every stdout/stderr line
+// emitted by PowerShell outside of JSON response markers. The channel is
+// closed when the runner stops. Read from this channel to stream PSADT
+// log output in real time during long operations.
+func (r *Runner) LiveOutput() <-chan string {
+	return r.liveOutputCh
 }
 
 // Heartbeat sends a simple command to verify the process is responsive.
