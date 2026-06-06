@@ -61,3 +61,72 @@ func (s *Session) InvokeAllUsersRegistryAction(scriptBlock string, opts ...types
 	cmd := fmt.Sprintf("Invoke-ADTAllUsersRegistryAction -ScriptBlock %s", cmdbuilder.FormatScriptBlock(scriptBlock))
 	return s.executeVoid(ctx, cmd)
 }
+
+// ConvertRegistryPath converts a registry path between long and short forms.
+func (s *Session) ConvertRegistryPath(registryPath string, toShort bool) (*types.RegistryPathInfo, error) {
+	ctx, cancel := s.getContext()
+	defer cancel()
+	cmd := fmt.Sprintf("Convert-ADTRegistryPath -RegistryPath %s", cmdbuilder.EscapeString(registryPath))
+	if toShort {
+		cmd += " -ToShortPath"
+	}
+	data, err := s.execute(ctx, cmd)
+	if err != nil {
+		return nil, err
+	}
+	var result types.RegistryPathInfo
+	if err := parser.ParseResponse(data, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// GetRegistryKeyMultiString is a typed version of GetRegistryKey that returns a
+// MultiString ([]string) value.
+func (s *Session) GetRegistryKeyMultiString(key, name string) ([]string, error) {
+	ctx, cancel := s.getContext()
+	defer cancel()
+	cmd := fmt.Sprintf("(Get-ADTRegistryKey -Key %s -Name %s).%s",
+		escapeArg(key), escapeArg(name), escapeArg(name))
+	data, err := s.execute(ctx, cmd)
+	if err != nil {
+		return nil, err
+	}
+	var result []string
+	if err := parser.ParseResponse(data, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// GetRegistryKeyBinary is a typed version of GetRegistryKey that returns a
+// Binary ([]byte) value.
+func (s *Session) GetRegistryKeyBinary(key, name string) ([]byte, error) {
+	ctx, cancel := s.getContext()
+	defer cancel()
+	cmd := fmt.Sprintf("(Get-ADTRegistryKey -Key %s -Name %s).%s",
+		escapeArg(key), escapeArg(name), escapeArg(name))
+	data, err := s.execute(ctx, cmd)
+	if err != nil {
+		return nil, err
+	}
+	var result []byte
+	if err := parser.ParseResponse(data, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// GetRegistryKeyQWord is a typed version of GetRegistryKey that returns a
+// QWord (uint64) value.
+func (s *Session) GetRegistryKeyQWord(key, name string) (uint64, error) {
+	ctx, cancel := s.getContext()
+	defer cancel()
+	cmd := fmt.Sprintf("(Get-ADTRegistryKey -Key %s -Name %s).%s",
+		escapeArg(key), escapeArg(name), escapeArg(name))
+	data, err := s.execute(ctx, cmd)
+	if err != nil {
+		return 0, err
+	}
+	return parser.ParseUint64(data)
+}

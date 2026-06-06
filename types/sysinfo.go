@@ -57,7 +57,11 @@ type ExecutableInfo struct {
 	LegalCopyright   string `json:"LegalCopyright"`
 }
 
-// WindowTitle represents a window title result.
+// PowerShellProcessPathInfo result of Get-ADTPowerShellProcessPath.
+type PowerShellProcessPathInfo struct {
+	Path    string `json:"Path"`
+	Version string `json:"Version"`
+}
 type WindowTitle struct {
 	WindowTitle   string `json:"WindowTitle"`
 	ParentProcess string `json:"ParentProcess"`

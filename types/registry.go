@@ -37,6 +37,20 @@ type TestRegistryValueOptions struct {
 	Wow6432Node bool   `ps:"Wow6432Node,switch"`
 }
 
+// ConvertRegistryPathOptions options for Convert-ADTRegistryPath.
+type ConvertRegistryPathOptions struct {
+	RegistryPath string `ps:"RegistryPath"`
+	ToShortPath  bool   `ps:"ToShortPath,switch"`
+}
+
+// RegistryPathInfo result of Convert-ADTRegistryPath.
+type RegistryPathInfo struct {
+	RegistryPath    string `json:"RegistryPath"`
+	RegistryHive    string `json:"RegistryHive"`
+	RegistryKey     string `json:"RegistryKey"`
+	RegistryKeyPath string `json:"RegistryKeyPath"`
+}
+
 // AllUsersRegistryOptions options for Invoke-ADTAllUsersRegistryAction.
 type AllUsersRegistryOptions struct {
 	UserProfiles []UserProfile `ps:"UserProfiles"`

@@ -38,3 +38,17 @@ type RetryOptions struct {
 type SCCMTaskOptions struct {
 	ScheduleID string `ps:"ScheduleID"`
 }
+
+// ModuleCallbackOptions options for managing module callbacks.
+type ModuleCallbackOptions struct {
+	HookPoint string `ps:"HookPoint"`
+	Name      string `ps:"Name"`
+	Script    string `ps:"Script"`
+}
+
+// CallbackInfo represents a registered module callback.
+type CallbackInfo struct {
+	Name      string `json:"Name"`
+	HookPoint string `json:"HookPoint"`
+	Script    string `json:"Script"`
+}

@@ -5,6 +5,7 @@ package psadt
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/pedrostefanogv/go-psadt/internal/parser"
 	"github.com/pedrostefanogv/go-psadt/types"
@@ -23,7 +24,7 @@ func (c *Client) GetEnvironment() (*types.EnvironmentInfo, error) {
 // GetEnvironmentWithContext collects environment variables with an explicit context.
 func (c *Client) GetEnvironmentWithContext(ctx context.Context) (*types.EnvironmentInfo, error) {
 	c.envMu.Lock()
-	if c.envCached && c.envCache != nil {
+	if c.envCache != nil && c.envCacheTTL > 0 && time.Since(c.envCachedAt) < c.envCacheTTL {
 		env := c.envCache
 		c.envMu.Unlock()
 		return env, nil
@@ -166,7 +167,7 @@ func (c *Client) GetEnvironmentWithContext(ctx context.Context) (*types.Environm
 	// Cache the result
 	c.envMu.Lock()
 	c.envCache = &env
-	c.envCached = true
+	c.envCachedAt = time.Now()
 	c.envMu.Unlock()
 
 	return &env, nil

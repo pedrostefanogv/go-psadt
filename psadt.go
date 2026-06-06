@@ -19,8 +19,9 @@ import (
 )
 
 const (
-	defaultModuleName = "PSAppDeployToolkit"
-	defaultMinVersion = "4.1.0"
+	defaultModuleName  = "PSAppDeployToolkit"
+	defaultMinVersion  = "4.1.0"
+	defaultEnvCacheTTL = 5 * time.Minute
 )
 
 // Client is the main entry point for interacting with PSADT.
@@ -32,9 +33,10 @@ type Client struct {
 	minVersion string
 	timeout    time.Duration
 
-	envMu     sync.Mutex
-	envCache  *types.EnvironmentInfo
-	envCached bool
+	envMu       sync.Mutex
+	envCache    *types.EnvironmentInfo
+	envCachedAt time.Time
+	envCacheTTL time.Duration
 }
 
 // Option configures a Client.
@@ -47,6 +49,7 @@ type clientConfig struct {
 	timeout        time.Duration
 	logger         *slog.Logger
 	usePowerShell7 bool
+	envCacheTTL    time.Duration
 }
 
 // WithPSPath sets the path to the PowerShell executable.
@@ -112,11 +115,12 @@ func NewClient(opts ...Option) (*Client, error) {
 	}
 
 	client := &Client{
-		runner:     r,
-		logger:     cfg.logger,
-		moduleName: cfg.moduleName,
-		minVersion: cfg.minVersion,
-		timeout:    cfg.timeout,
+		runner:      r,
+		logger:      cfg.logger,
+		moduleName:  cfg.moduleName,
+		minVersion:  cfg.minVersion,
+		timeout:     cfg.timeout,
+		envCacheTTL: defaultEnvCacheTTL,
 	}
 
 	ctx := context.Background()
@@ -199,7 +203,14 @@ func (c *Client) defaultContext() (context.Context, context.CancelFunc) {
 // GetEnvironment will fetch fresh data from the PowerShell runner.
 func (c *Client) InvalidateEnvCache() {
 	c.envMu.Lock()
-	c.envCached = false
 	c.envCache = nil
+	c.envCachedAt = time.Time{}
 	c.envMu.Unlock()
+}
+
+// WithEnvCacheTTL sets the TTL for the environment cache. Set to 0 to disable caching.
+func WithEnvCacheTTL(ttl time.Duration) Option {
+	return func(c *clientConfig) {
+		c.envCacheTTL = ttl
+	}
 }

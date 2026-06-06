@@ -55,13 +55,15 @@ func (s *Session) InvokeCommandWithRetries(scriptBlock string, opts ...types.Ret
 	return s.executeVoid(ctx, cmd)
 }
 
-// GetUniversalDate gets a date/time string formatted for the current culture.
+// GetUniversalDate gets a date/time string in universal sortable format.
+// If no dateTime is provided, returns the current UTC time.
 func (s *Session) GetUniversalDate(dateTime ...string) (string, error) {
 	ctx, cancel := s.getContext()
 	defer cancel()
-	cmd := "Get-ADTUniversalDate"
+	cmd := "[DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ss.fffZ')"
 	if len(dateTime) > 0 && dateTime[0] != "" {
-		cmd += fmt.Sprintf(" -DateTime %s", cmdbuilder.EscapeString(dateTime[0]))
+		cmd = fmt.Sprintf("([DateTime]%s).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ss.fffZ')",
+			cmdbuilder.EscapeString(dateTime[0]))
 	}
 	data, err := s.execute(ctx, cmd)
 	if err != nil {

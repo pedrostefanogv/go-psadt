@@ -48,3 +48,34 @@ func (s *Session) RemoveEnvironmentVariable(variable string, target ...types.Env
 	}
 	return s.executeVoid(ctx, cmd)
 }
+
+// GetEnvironmentTable retrieves the complete PSADT environment table as a flat key→value map.
+func (s *Session) GetEnvironmentTable() (types.EnvironmentTableInfo, error) {
+	ctx, cancel := s.getContext()
+	defer cancel()
+	data, err := s.execute(ctx, "Get-ADTEnvironmentTable")
+	if err != nil {
+		return nil, err
+	}
+	var result types.EnvironmentTableInfo
+	if err := parser.ParseResponse(data, &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// ExportEnvironmentTableToSessionState exports the environment table to the current
+// PowerShell session state, making PSADT variables available as $envVarName.
+func (s *Session) ExportEnvironmentTableToSessionState() error {
+	ctx, cancel := s.getContext()
+	defer cancel()
+	return s.executeVoid(ctx, "Export-ADTEnvironmentTableToSessionState")
+}
+
+// UpdateEnvironmentPsProvider updates the PowerShell Environment provider with
+// the latest values from the PSADT environment table.
+func (s *Session) UpdateEnvironmentPsProvider() error {
+	ctx, cancel := s.getContext()
+	defer cancel()
+	return s.executeVoid(ctx, "Update-ADTEnvironmentPsProvider")
+}

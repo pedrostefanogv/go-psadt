@@ -163,3 +163,6 @@ type OfficeInfo struct {
 type MiscInfo struct {
 	RunningTaskSequence bool `json:"RunningTaskSequence"`
 }
+
+// EnvironmentTableInfo represents the PSADT environment table as a flat key→value map.
+type EnvironmentTableInfo map[string]string

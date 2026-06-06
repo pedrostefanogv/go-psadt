@@ -14,3 +14,11 @@ type LogEntryOptions struct {
 	PassThru         bool        `ps:"PassThru,switch"`
 	DebugMessage     bool        `ps:"DebugMessage,switch"`
 }
+
+// LogFileNameOptions options for New-ADTLogFileName.
+type LogFileNameOptions struct {
+	AppName    string `ps:"AppName"`
+	AppVersion string `ps:"AppVersion"`
+	Extension  string `ps:"Extension"`
+	UseDate    bool   `ps:"UseDate,switch"`
+}

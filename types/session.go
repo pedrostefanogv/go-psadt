@@ -48,11 +48,18 @@ type SessionConfig struct {
 
 // SessionProperties contains read-only properties of an open ADT session.
 type SessionProperties struct {
+	AppName         string `json:"AppName"`
+	AppVendor       string `json:"AppVendor"`
+	AppVersion      string `json:"AppVersion"`
+	DeploymentType  string `json:"DeploymentType"`
+	DeployMode      string `json:"DeployMode"`
+	ScriptDirectory string `json:"ScriptDirectory"`
+	LogPath         string `json:"LogPath"`
+	LogName         string `json:"LogName"`
 	CurrentDate     string `json:"CurrentDate"`
 	CurrentDateTime string `json:"CurrentDateTime"`
 	CurrentTime     string `json:"CurrentTime"`
 	InstallPhase    string `json:"InstallPhase"`
-	LogPath         string `json:"LogPath"`
 	UseDefaultMsi   bool   `json:"UseDefaultMsi"`
 
 	DeployAppScriptFriendlyName string `json:"DeployAppScriptFriendlyName"`
