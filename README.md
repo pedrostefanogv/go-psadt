@@ -61,7 +61,7 @@ Example-specific docs and entry points:
 
 ## Overview
 
-**go-psadt** is a Go library that wraps the [PSAppDeployToolkit (PSADT)](https://psappdeploytoolkit.com/) v4.1.x — a PowerShell framework with **135+ exported functions** for Windows software deployment automation. This library exposes **~105 public methods** as strongly-typed Go functions, enabling Go applications to leverage PSADT's full power without writing PowerShell directly.
+**go-psadt** is a Go library that wraps the [PSAppDeployToolkit (PSADT)](https://psappdeploytoolkit.com/) v4.1.x — a PowerShell framework with **141 exported functions** for Windows software deployment automation. This library exposes **~127 public methods** covering ~90% of the PSADT API as strongly-typed Go functions, enabling Go applications to leverage PSADT's full power without writing PowerShell directly.
 
 ### Why go-psadt?
 
@@ -69,13 +69,13 @@ Example-specific docs and entry points:
 - **Type-safe API** — catch errors at compile time, not runtime
 - **No PowerShell knowledge required** — the library handles all command construction and response parsing
 - **Persistent process** — a single PowerShell instance serves all calls, avoiding per-command startup overhead
-- **Full PSADT coverage** — UI dialogs, MSI/EXE/MSP installers, registry, filesystem, services, and more
+- **Near-complete PSADT coverage** — ~90% of the 141 PSADT v4.1 functions wrapped: UI dialogs, MSI/EXE/MSP installers, registry, filesystem, services, fonts, module callbacks, and more
 
 ## Features
 
 | Feature | Description |
 |---|---|
-| **~105 wrapped functions** | Strongly-typed Go methods covering all major PSADT capabilities |
+| **~127 wrapped functions** | Strongly-typed Go methods covering ~90% of the PSADT v4.1 API |
 | **Persistent PowerShell process** | Single `powershell.exe` instance with stdin/stdout JSON protocol |
 | **Type-safe options** | All parameters are Go structs with `ps:` struct tags — no raw strings |
 | **Session management** | Full Open/Close ADT session lifecycle with configuration |
@@ -186,32 +186,107 @@ For complete package mapping, protocol details, and lifecycle diagrams, see [ARC
 | **UI** | 8 | `Show-ADTInstallationWelcome`, `Show-ADTInstallationPrompt`, `Show-ADTInstallationProgress`, `Close-ADTInstallationProgress`, `Show-ADTInstallationRestartPrompt`, `Show-ADTDialogBox`, `Show-ADTBalloonTip`, `Show-ADTHelpConsole` |
 | **Process** | 9 | `Start-ADTProcess`, `Start-ADTProcessAsUser`, `Start-ADTMsiProcess`, `Start-ADTMsiProcessAsUser`, `Start-ADTMspProcess`, `Start-ADTMspProcessAsUser`, `Block-ADTAppExecution`, `Unblock-ADTAppExecution`, `Get-ADTRunningProcesses` |
 | **Application** | 2 | `Get-ADTApplication`, `Uninstall-ADTApplication` |
-| **Registry** | 5 | `Get-ADTRegistryKey`, `Set-ADTRegistryKey`, `Remove-ADTRegistryKey`, `Test-ADTRegistryValue`, `Invoke-ADTAllUsersRegistryAction` |
+| **Registry** | 9 | `Get-ADTRegistryKey`, `Set-ADTRegistryKey`, `Remove-ADTRegistryKey`, `Test-ADTRegistryValue`, `Invoke-ADTAllUsersRegistryAction`, `ConvertRegistryPath`, plus typed wrappers: `GetRegistryKeyString`, `GetRegistryKeyDWord`, `GetRegistryKeyMultiString`, `GetRegistryKeyBinary`, `GetRegistryKeyQWord` |
 | **Filesystem** | 8 | `Copy-ADTFile`, `Copy-ADTFileToUserProfiles`, `Remove-ADTFile`, `Remove-ADTFileFromUserProfiles`, `New-ADTFolder`, `Remove-ADTFolder`, `Copy-ADTContentToCache`, `Remove-ADTContentFromCache` |
 | **INI** | 6 | `Get-ADTIniValue`, `Set-ADTIniValue`, `Remove-ADTIniValue`, `Get-ADTIniSection`, `Set-ADTIniSection`, `Remove-ADTIniSection` |
-| **Environment** | 3 | `Get-ADTEnvironmentVariable`, `Set-ADTEnvironmentVariable`, `Remove-ADTEnvironmentVariable` |
-| **Shortcut** | 3 | `New-ADTShortcut`, `Set-ADTShortcut`, `Get-ADTShortcut` |
+| **Environment** | 6 | `Get-ADTEnvironmentVariable`, `Set-ADTEnvironmentVariable`, `Remove-ADTEnvironmentVariable`, `GetEnvironmentTable`, `ExportEnvironmentTableToSessionState`, `UpdateEnvironmentPsProvider` |
+| **Shortcut** | 4 | `New-ADTShortcut`, `Set-ADTShortcut`, `Get-ADTShortcut`, `RemoveDesktopShortcut` |
 | **Service** | 5 | `Start-ADTServiceAndDependencies`, `Stop-ADTServiceAndDependencies`, `Get-ADTServiceStartMode`, `Set-ADTServiceStartMode`, `Test-ADTServiceExists` |
+| **Font** | 2 | `Add-ADTFont`, `Remove-ADTFont` |
 | **WIM/ZIP** | 3 | `Mount-ADTWimFile`, `Dismount-ADTWimFile`, `New-ADTZipFile` |
 | **System Info** | 11 | `Get-ADTLoggedOnUser`, `Get-ADTFreeDiskSpace`, `Get-ADTPendingReboot`, `Get-ADTOperatingSystemInfo`, `Get-ADTUserProfiles`, `Get-ADTFileVersion`, `Get-ADTExecutableInfo`, `Get-ADTPEFileArchitecture`, `Get-ADTWindowTitle`, `Get-ADTPresentationSettingsEnabledUsers`, `Get-ADTUserNotificationState` |
-| **Checks** | 10 | `Test-ADTBattery`, `Test-ADTCallerIsAdmin`, `Test-ADTNetworkConnection`, `Test-ADTMutexAvailability`, `Test-ADTPowerPoint`, `Test-ADTMicrophoneInUse`, `Test-ADTUserIsBusy`, `Test-ADTEspActive`, `Test-ADTOobeCompleted`, `Test-ADTMSUpdates` |
+| **Checks** | 12 | `Test-ADTBattery`, `Test-ADTCallerIsAdmin`, `Test-ADTNetworkConnection`, `Test-ADTMutexAvailability`, `Test-ADTPowerPoint`, `Test-ADTMicrophoneInUse`, `Test-ADTUserIsBusy`, `Test-ADTEspActive`, `Test-ADTOobeCompleted`, `Test-ADTMSUpdates`, `TestUserInFocusMode`, `TestSessionActive`, `GetUserToastNotificationMode` |
 | **DLL** | 3 | `Register-ADTDll`, `Unregister-ADTDll`, `Invoke-ADTRegSvr32` |
 | **MSI** | 4 | `Get-ADTMsiExitCodeMessage`, `Get-ADTMsiTableProperty`, `Set-ADTMsiProperty`, `New-ADTMsiTransform` |
 | **Active Setup** | 1 | `Set-ADTActiveSetup` |
 | **Edge** | 2 | `Add-ADTEdgeExtension`, `Remove-ADTEdgeExtension` |
 | **System** | 7 | `Update-ADTDesktop`, `Update-ADTGroupPolicy`, `Install-ADTMSUpdates`, `Install-ADTSCCMSoftwareUpdates`, `Invoke-ADTSCCMTask`, `Enable-ADTTerminalServerInstallMode`, `Disable-ADTTerminalServerInstallMode` |
-| **Logging** | 1 | `Write-ADTLogEntry` |
+| **Logging** | 4 | `Write-ADTLogEntry`, plus helpers: `WriteLogEntryInfo`, `WriteLogEntryWarning`, `WriteLogEntryError` |
 | **Config** | 6 | `Get-ADTConfig`, `Get-ADTStringTable`, `Get-ADTDeferHistory`, `Set-ADTDeferHistory`, `Reset-ADTDeferHistory`, `Set-ADTPowerShellCulture` |
-| **Utilities** | 8 | `Send-ADTKeys`, `Convert-ADTToNTAccountOrSID`, `Set-ADTItemPermission`, `Invoke-ADTCommandWithRetries`, `Get-ADTUniversalDate`, `Remove-ADTInvalidFileNameChars`, `Out-ADTPowerShellEncodedCommand`, `New-ADTTemplate` |
+| **Module / Session** | 8 | `TestModuleInitialized`, `GetSession`, `GetPowerShellProcessPath`, `NewLogFileName`, `AddModuleCallback`, `GetModuleCallback`, `RemoveModuleCallback`, `ClearModuleCallback` |
+| **Utilities** | 8 | `Send-ADTKeys`, `ConvertToNTAccountOrSID`, `Set-ADTItemPermission`, `Invoke-ADTCommandWithRetries`, `GetUniversalDate`, `RemoveInvalidFileNameChars`, `OutPowerShellEncodedCommand`, `NewTemplate` |
+| **Client / Env Cache** | 4 | `GetEnvironment` (cached with TTL), `InvalidateEnvCache`, `ExecuteRawScript`, `ExecuteRawVoidScript` — all available at Client level without a session |
+| **Batch / Raw** | 3 | `ExecuteBatch` (multi-command round-trip), `ExecuteRawScript`, `ExecuteRawVoidScript` — escape hatches for custom PSADT scripts |
 
 ## Client Options
 
 ```go
-psadt.WithTimeout(10 * time.Minute)     // Command execution timeout (default: 5 min)
+psadt.WithTimeout(10 * time.Minute)     // Command execution timeout (default: 30s)
 psadt.WithPSPath("pwsh.exe")            // Custom PowerShell executable path
 psadt.WithPowerShell7()                 // Use PowerShell 7+ (pwsh.exe)
 psadt.WithMinModuleVersion("4.1.0")     // Minimum PSADT module version
 psadt.WithLogger(myLogger)              // Custom *slog.Logger for diagnostics
+psadt.WithEnvCacheTTL(5 * time.Minute) // TTL for GetEnvironment cache (default: 5min, 0=disable)
+```
+
+## Advanced Usage
+
+### Live Output Streaming
+
+Stream PSADT log output in real time during long operations:
+
+```go
+// Start streaming goroutine
+liveCh := session.LiveOutput()
+go func() {
+    for line := range liveCh {
+        fmt.Printf("[PSADT] %s\n", line)
+    }
+}()
+
+// Run a long installation — logs stream in real time
+session.StartMsiProcess(types.MsiProcessOptions{
+    Action:   types.MsiInstall,
+    FilePath: "setup.msi",
+})
+```
+
+### Batch Execution
+
+Multiple commands in a single round-trip for lower latency:
+
+```go
+// 1 round-trip instead of 3
+data, _ := session.ExecuteBatch(ctx, []string{
+    "Get-ADTFreeDiskSpace",
+    "Test-ADTCallerIsAdmin",
+    "Test-ADTNetworkConnection",
+})
+```
+
+### Context Propagation
+
+Set deadlines or cancellation for a group of operations without passing `ctx` everywhere:
+
+```go
+ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+defer cancel()
+result, _ := session.WithContext(ctx).GetApplication(opts)
+```
+
+### Typed Registry Access
+
+Convenience wrappers for common registry value types:
+
+```go
+// String
+version, _ := session.GetRegistryKeyString(`HKLM\SOFTWARE\Contoso`, "Version")
+// DWord (uint32)
+flag, _ := session.GetRegistryKeyDWord(`HKLM\SOFTWARE\Contoso`, "ConfigFlag")
+// MultiString ([]string)
+list, _ := session.GetRegistryKeyMultiString(`HKLM\SOFTWARE\Contoso`, "Servers")
+// Binary ([]byte)
+data, _ := session.GetRegistryKeyBinary(`HKLM\SOFTWARE\Contoso`, "Blob")
+// QWord (uint64)
+big, _ := session.GetRegistryKeyQWord(`HKLM\SOFTWARE\Contoso`, "LargeValue")
+```
+
+### Structured Logging Helpers
+
+```go
+session.WriteLogEntryInfo("Deployment started", "MyAgent")
+session.WriteLogEntryWarning("Low disk space detected", "MyAgent")
+session.WriteLogEntryError("Installation failed", "MyAgent")
 ```
 
 ## Examples
@@ -265,7 +340,7 @@ Contributions are welcome. Please open an issue first to discuss what you would 
 
 ## Visão Geral
 
-**go-psadt** é uma biblioteca Go que encapsula o [PSAppDeployToolkit (PSADT)](https://psappdeploytoolkit.com/) v4.1.x — um framework PowerShell com **135+ funções exportadas** para automação de deployment de software Windows. Esta biblioteca expõe **~105 métodos públicos** como funções Go fortemente tipadas, permitindo que aplicações Go utilizem todo o poder do PSADT sem escrever PowerShell diretamente.
+**go-psadt** é uma biblioteca Go que encapsula o [PSAppDeployToolkit (PSADT)](https://psappdeploytoolkit.com/) v4.1.x — um framework PowerShell com **141 funções exportadas** para automação de deployment de software Windows. Esta biblioteca expõe **~127 métodos públicos** cobrindo ~90% da API do PSADT como funções Go fortemente tipadas, permitindo que aplicações Go utilizem todo o poder do PSADT sem escrever PowerShell diretamente.
 
 ### Por que go-psadt?
 
@@ -273,13 +348,13 @@ Contributions are welcome. Please open an issue first to discuss what you would 
 - **API type-safe** — erros são capturados em tempo de compilação, não em runtime
 - **Sem necessidade de conhecimento PowerShell** — a biblioteca constrói todos os comandos e faz o parsing das respostas
 - **Processo persistente** — uma única instância PowerShell atende todas as chamadas, evitando overhead de inicialização por comando
-- **Cobertura completa do PSADT** — diálogos UI, instaladores MSI/EXE/MSP, registro, filesystem, serviços e mais
+- **Cobertura quase completa do PSADT** — ~90% das 141 funções do PSADT v4.1 encapsuladas: diálogos UI, instaladores MSI/EXE/MSP, registro, filesystem, serviços, fontes, callbacks de módulo e mais
 
 ## Funcionalidades
 
 | Funcionalidade | Descrição |
 |---|---|
-| **~105 funções encapsuladas** | Métodos Go fortemente tipados cobrindo todas as capacidades principais do PSADT |
+| **~127 funções encapsuladas** | Métodos Go fortemente tipados cobrindo ~90% da API do PSADT v4.1 |
 | **Processo PowerShell persistente** | Instância única de `powershell.exe` com protocolo JSON via stdin/stdout |
 | **Opções type-safe** | Todos os parâmetros são structs Go com tags `ps:` — sem strings cruas |
 | **Gerenciamento de sessão** | Ciclo de vida completo de sessão ADT (Open/Close) com configuração |
@@ -386,32 +461,107 @@ Para mapeamento completo de pacotes, detalhes do protocolo e diagramas de ciclo 
 | **UI** | 8 | Boas-vindas, prompts, progresso, diálogos, notificações |
 | **Processo** | 9 | Iniciar EXE/MSI/MSP, bloquear/desbloquear apps |
 | **Aplicação** | 2 | Buscar e desinstalar aplicações |
-| **Registro** | 5 | Get/Set/Remove chaves, testar valores, ação multi-usuário |
+| **Registro** | 9 | Get/Set/Remove chaves, testar valores, conversão de paths, wrappers tipados (String/DWord/MultiString/Binary/QWord) |
 | **Filesystem** | 8 | Copiar/remover arquivos/pastas, perfis de usuário, cache |
 | **INI** | 6 | Get/Set/Remove valores e seções de arquivos INI |
-| **Ambiente** | 3 | Get/Set/Remove variáveis de ambiente |
-| **Atalho** | 3 | Criar/modificar/consultar atalhos |
+| **Ambiente** | 6 | Get/Set/Remove variáveis, tabela de ambiente, export para sessão |
+| **Atalho** | 4 | Criar/modificar/consultar/remover atalhos |
 | **Serviço** | 5 | Iniciar/parar serviços, modo de início, verificar existência |
+| **Fontes** | 2 | Adicionar/remover fontes do sistema |
 | **WIM/ZIP** | 3 | Montar/desmontar WIM, criar ZIP |
 | **Info Sistema** | 11 | Usuários, disco, reboot, OS, perfis, versões, janelas |
-| **Verificações** | 10 | Bateria, admin, rede, mutex, PowerPoint, estado ocupado |
+| **Verificações** | 12 | Bateria, admin, rede, mutex, PowerPoint, microfone, estado ocupado, Focus Mode, sessão ativa |
 | **DLL** | 3 | Registrar/desregistrar DLL, RegSvr32 |
 | **MSI** | 4 | Códigos de saída, propriedades de tabela, transforms |
 | **Active Setup** | 1 | Configurar entradas de Active Setup |
 | **Edge** | 2 | Adicionar/remover políticas de extensão Edge |
 | **Sistema** | 7 | Desktop, GPO, MS Updates, SCCM, Terminal Server |
-| **Logging** | 1 | Escrever entradas de log |
+| **Logging** | 4 | Escrever entradas de log + helpers Info/Warning/Error |
 | **Config** | 6 | Configuração, tabela de strings, histórico de adiamento |
-| **Utilitários** | 8 | SendKeys, permissões, retry, encoding, templates |
+| **Módulo / Sessão** | 8 | Inicialização do módulo, propriedades da sessão, callbacks, path do PowerShell, nome de log |
+| **Utilitários** | 8 | SendKeys, permissões, retry, data universal, encoding, templates |
+| **Client / Cache** | 4 | GetEnvironment com cache TTL, invalidar cache, scripts raw sem sessão |
+| **Batch / Raw** | 3 | ExecuteBatch (múltiplos comandos em 1 round-trip), ExecuteRawScript, ExecuteRawVoidScript |
 
 ## Opções do Cliente
 
 ```go
-psadt.WithTimeout(10 * time.Minute)     // Timeout de execução de comando (padrão: 5 min)
-psadt.WithPSPath("pwsh.exe")            // Caminho customizado do executável PowerShell
-psadt.WithPowerShell7()                 // Usar PowerShell 7+ (pwsh.exe)
-psadt.WithMinModuleVersion("4.1.0")     // Versão mínima do módulo PSADT
-psadt.WithLogger(myLogger)              // *slog.Logger customizado para diagnósticos
+psadt.WithTimeout(10 * time.Minute)      // Timeout de execução de comando (padrão: 30s)
+psadt.WithPSPath("pwsh.exe")             // Caminho customizado do executável PowerShell
+psadt.WithPowerShell7()                  // Usar PowerShell 7+ (pwsh.exe)
+psadt.WithMinModuleVersion("4.1.0")      // Versão mínima do módulo PSADT
+psadt.WithLogger(myLogger)               // *slog.Logger customizado para diagnósticos
+psadt.WithEnvCacheTTL(5 * time.Minute)  // TTL do cache de ambiente (padrão: 5min, 0=desabilitar)
+```
+
+## Uso Avançado
+
+### Streaming de Saída em Tempo Real
+
+Transmita logs do PSADT em tempo real durante operações longas:
+
+```go
+// Iniciar goroutine de streaming
+liveCh := session.LiveOutput()
+go func() {
+    for line := range liveCh {
+        fmt.Printf("[PSADT] %s\n", line)
+    }
+}()
+
+// Executar instalação longa — logs aparecem em tempo real
+session.StartMsiProcess(types.MsiProcessOptions{
+    Action:   types.MsiInstall,
+    FilePath: "setup.msi",
+})
+```
+
+### Execução em Lote (Batch)
+
+Múltiplos comandos em um único round-trip para menor latência:
+
+```go
+// 1 round-trip em vez de 3
+data, _ := session.ExecuteBatch(ctx, []string{
+    "Get-ADTFreeDiskSpace",
+    "Test-ADTCallerIsAdmin",
+    "Test-ADTNetworkConnection",
+})
+```
+
+### Propagação de Contexto
+
+Defina deadlines ou cancelamento para um grupo de operações sem passar `ctx` em cada chamada:
+
+```go
+ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+defer cancel()
+result, _ := session.WithContext(ctx).GetApplication(opts)
+```
+
+### Acesso Tipado ao Registro
+
+Wrappers convenientes para tipos comuns de valores do registro:
+
+```go
+// String
+version, _ := session.GetRegistryKeyString(`HKLM\SOFTWARE\Contoso`, "Version")
+// DWord (uint32)
+flag, _ := session.GetRegistryKeyDWord(`HKLM\SOFTWARE\Contoso`, "ConfigFlag")
+// MultiString ([]string)
+list, _ := session.GetRegistryKeyMultiString(`HKLM\SOFTWARE\Contoso`, "Servers")
+// Binary ([]byte)
+data, _ := session.GetRegistryKeyBinary(`HKLM\SOFTWARE\Contoso`, "Blob")
+// QWord (uint64)
+big, _ := session.GetRegistryKeyQWord(`HKLM\SOFTWARE\Contoso`, "LargeValue")
+```
+
+### Helpers de Log Estruturados
+
+```go
+session.WriteLogEntryInfo("Deployment iniciado", "MyAgent")
+session.WriteLogEntryWarning("Espaço em disco baixo detectado", "MyAgent")
+session.WriteLogEntryError("Instalação falhou", "MyAgent")
 ```
 
 ## Exemplos

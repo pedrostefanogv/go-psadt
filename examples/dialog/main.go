@@ -42,6 +42,11 @@ func main() {
 	}
 	fmt.Printf("User chose: %s\n", result)
 
+	// Log structured entries for UI events
+	if err := session.WriteLogEntryInfo(fmt.Sprintf("User clicked: %s", result), "DialogDemo"); err != nil {
+		log.Printf("Log write failed: %v", err)
+	}
+
 	// Show a balloon tip notification
 	if err := session.ShowBalloonTip(types.BalloonTipOptions{
 		BalloonTipText:  "Installation is starting...",
@@ -61,6 +66,18 @@ func main() {
 		log.Fatalf("Prompt failed: %v", err)
 	}
 	fmt.Printf("Prompt result: %+v\n", promptResult)
+
+	// Generate demo log file name
+	logName, err := session.NewLogFileName(types.LogFileNameOptions{
+		AppName:    "DialogDemo",
+		AppVersion: "1.0",
+		UseDate:    true,
+	})
+	if err != nil {
+		log.Printf("Log name failed: %v", err)
+	} else {
+		fmt.Printf("Demo log: %s\n", logName)
+	}
 
 	fmt.Println("Dialog demo completed!")
 }

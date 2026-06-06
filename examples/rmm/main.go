@@ -99,6 +99,7 @@ func executeRMMTask(task RMMTask) RMMResult {
 	}()
 
 	// 2. Get environment info (no session needed yet)
+	client.InvalidateEnvCache() // force fresh env snapshot
 	env, err := client.GetEnvironment()
 	if err != nil {
 		logf("WARNING: Could not get environment: %v", err)

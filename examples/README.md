@@ -24,8 +24,9 @@ This directory contains standalone, runnable Go programs demonstrating the main 
 | [`install/`](install/) | Full MSI installation workflow with welcome dialog, progress bar, registry write | `Open-ADTSession`, `Show-ADTInstallationWelcome`, `Show-ADTInstallationProgress`, `Start-ADTMsiProcess`, `Set-ADTRegistryKey`, `Close-ADTInstallationProgress` |
 | [`uninstall/`](uninstall/) | Application search and uninstallation with registry cleanup | `Open-ADTSession`, `Show-ADTInstallationWelcome`, `Get-ADTApplication`, `Uninstall-ADTApplication`, `Remove-ADTRegistryKey` |
 | [`dialog/`](dialog/) | UI dialogs: confirmation box, balloon tip notification, installation prompt | `Show-ADTDialogBox`, `Show-ADTBalloonTip`, `Show-ADTInstallationPrompt` |
-| [`query/`](query/) | System information queries without touching the filesystem | `Get-ADTEnvironment`, `Test-ADTCallerIsAdmin`, `Test-ADTNetworkConnection`, `Get-ADTFreeDiskSpace`, `Get-ADTLoggedOnUser`, `Get-ADTPendingReboot`, `Test-ADTServiceExists` |
+| [`query/`](query/) | System information queries without touching the filesystem | `GetEnvironment` (client-level), `TestCallerIsAdmin`, `TestNetworkConnection`, `GetFreeDiskSpace`, `GetLoggedOnUser`, `GetPendingReboot`, `TestServiceExists` |
 | [`gui/`](gui/) | Graphical UI lab (local web app) for testing dialogs, prompts, balloon alerts, progress, welcome options, and toolkit installation checks via PSGallery | `Show-ADTDialogBox`, `Show-ADTInstallationPrompt`, `Show-ADTBalloonTip`, `Show-ADTInstallationProgress`, `Show-ADTInstallationWelcome`, `Get-ADTConfig`, `Get-ADTEnvironment` |
+| [`rmm/`](rmm/) | RMM agent integration patterns: pre-flight checks, user state detection, deferral logic, batch execution, typed registry, raw scripts, client reconnection | `TestUserInFocusMode`, `TestBattery`, `ExecuteBatch`, `GetRegistryKeyString`, `ExecuteRawVoidScript`, `Reconnect`, `GetEnvironment` (cached) |
 
 ### Running an Example
 
@@ -114,6 +115,7 @@ Este diretório contém programas Go independentes e executáveis que demonstram
 | [`dialog/`](dialog/) | Diálogos de UI: caixa de confirmação, notificação balloon tip, prompt de instalação | `Show-ADTDialogBox`, `Show-ADTBalloonTip`, `Show-ADTInstallationPrompt` |
 | [`query/`](query/) | Consultas de informação do sistema sem tocar no filesystem | `Get-ADTEnvironment`, `Test-ADTCallerIsAdmin`, `Test-ADTNetworkConnection`, `Get-ADTFreeDiskSpace`, `Get-ADTLoggedOnUser`, `Get-ADTPendingReboot`, `Test-ADTServiceExists` |
 | [`gui/`](gui/) | Laboratório gráfico (web local) para testar diálogos, prompts, alertas balloon, progresso, opções de boas-vindas e checagem/instalação do toolkit via PSGallery | `Show-ADTDialogBox`, `Show-ADTInstallationPrompt`, `Show-ADTBalloonTip`, `Show-ADTInstallationProgress`, `Show-ADTInstallationWelcome`, `Get-ADTConfig`, `Get-ADTEnvironment` |
+| [`rmm/`](rmm/) | Padrões de integração com agentes RMM: verificações pré-voo, estado do usuário, lógica de adiamento, batch, registro tipado, scripts raw, reconexão do client | `TestUserInFocusMode`, `TestBattery`, `ExecuteBatch`, `GetRegistryKeyString`, `ExecuteRawVoidScript`, `Reconnect`, `GetEnvironment` (cacheado) |
 
 ### Executando um Exemplo
 

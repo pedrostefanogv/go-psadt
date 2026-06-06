@@ -35,7 +35,7 @@ examples/dialog/main.go
 ### Code Walkthrough
 
 ```go
-// 1. No explicit timeout — uses the default (5 minutes)
+// 1. No explicit timeout — uses the default (30 seconds per command)
 client, err := psadt.NewClient()
 
 // 2. Interactive session for UI dialogs
@@ -136,7 +136,7 @@ examples/dialog/main.go
 ### Walkthrough do Código
 
 ```go
-// 1. Sem timeout explícito — usa o padrão (5 minutos)
+// 1. Sem timeout explícito — usa o padrão (30 segundos por comando)
 client, err := psadt.NewClient()
 
 // 2. Sessão interativa para diálogos de UI

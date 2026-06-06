@@ -72,6 +72,36 @@ func main() {
 		log.Printf("Registry write failed: %v", err)
 	}
 
+	// Verify registry with typed access
+	installedVer, err := session.GetRegistryKeyString(`HKLM\SOFTWARE\Contoso\WidgetPro`, "Version")
+	if err != nil {
+		log.Printf("Registry verify failed: %v", err)
+	} else {
+		fmt.Printf("Verified installed version: %s\n", installedVer)
+	}
+
+	// Generate log file name for this deployment
+	logName, err := session.NewLogFileName(types.LogFileNameOptions{
+		AppName:    "WidgetPro",
+		AppVersion: "2.0.0",
+		UseDate:    true,
+	})
+	if err != nil {
+		log.Printf("Log name generation failed: %v", err)
+	} else {
+		fmt.Printf("Deployment log: %s\n", logName)
+	}
+
+	// Structured logging
+	if err := session.WriteLogEntryInfo("Widget Pro 2.0.0 installed successfully", "Installer"); err != nil {
+		log.Printf("Log write failed: %v", err)
+	}
+
+	// Update environment provider after installation
+	if err := session.UpdateEnvironmentPsProvider(); err != nil {
+		log.Printf("Environment update failed: %v", err)
+	}
+
 	// Close progress
 	if err := session.CloseInstallationProgress(); err != nil {
 		log.Printf("Close progress failed: %v", err)

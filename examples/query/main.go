@@ -40,6 +40,53 @@ func main() {
 	}
 	defer session.Close(0)
 
+	// Get PowerShell process path
+	psInfo, err := session.GetPowerShellProcessPath()
+	if err != nil {
+		log.Printf("PowerShell path query failed: %v", err)
+	} else {
+		fmt.Printf("PowerShell path: %s (%s)\n", psInfo.Path, psInfo.Version)
+	}
+
+	// Test module initialization
+	modInitialized, err := session.TestModuleInitialized()
+	if err != nil {
+		log.Printf("Module check failed: %v", err)
+	} else {
+		fmt.Printf("PSADT module initialized: %v\n", modInitialized)
+	}
+
+	// Get session properties
+	sessProps, err := session.GetSession()
+	if err != nil {
+		log.Printf("Session query failed: %v", err)
+	} else {
+		fmt.Printf("Session: %s/%s v%s (log: %s)\n", sessProps.AppName, sessProps.DeploymentType, sessProps.AppVersion, sessProps.LogName)
+	}
+
+	// Get environment table (flat key-value map)
+	envTable, err := session.GetEnvironmentTable()
+	if err != nil {
+		log.Printf("Environment table failed: %v", err)
+	} else {
+		fmt.Printf("Environment variables: %d\n", len(envTable))
+		if name, ok := envTable["envComputerName"]; ok {
+			fmt.Printf("  ComputerName: %s\n", name)
+		}
+	}
+
+	// Generate a log file name
+	logFileName, err := session.NewLogFileName(types.LogFileNameOptions{
+		AppName:    "SystemCheck",
+		AppVersion: "1.0",
+		UseDate:    true,
+	})
+	if err != nil {
+		log.Printf("Log file name generation failed: %v", err)
+	} else {
+		fmt.Printf("Log file name: %s\n", logFileName)
+	}
+
 	// Check admin privileges
 	isAdmin, err := session.TestCallerIsAdmin()
 	if err != nil {
@@ -89,6 +136,27 @@ func main() {
 		log.Printf("Service check failed: %v", err)
 	} else {
 		fmt.Printf("Spooler service exists: %v\n", svcExists)
+	}
+
+	// Typed registry query examples
+	regVer, err := session.GetRegistryKeyString(`HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion`, "ProductName")
+	if err != nil {
+		log.Printf("Registry string read failed: %v", err)
+	} else {
+		fmt.Printf("Registry (String): ProductName = %s\n", regVer)
+	}
+
+	// Convert registry path (long to short form)
+	regPath, err := session.ConvertRegistryPath(`HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft`, true)
+	if err != nil {
+		log.Printf("Registry path conversion failed: %v", err)
+	} else {
+		fmt.Printf("Registry path: %s -> %s\n", regPath.RegistryPath, regPath.RegistryKeyPath)
+	}
+
+	// Structured logging example
+	if err := session.WriteLogEntryInfo("System query completed successfully", "QueryExample"); err != nil {
+		log.Printf("Log write failed: %v", err)
 	}
 
 	fmt.Println("\nSystem query completed!")

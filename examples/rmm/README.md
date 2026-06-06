@@ -94,6 +94,9 @@ err := session.ExecuteRawVoidScript(ctx,
 ```go
 env, _ := client.GetEnvironment() // Fetches once
 client.InvalidateEnvCache()       // Force refresh on next call
+```
+
+### 8. Structured Result Reporting
 ```go
 result := RMMResult{
     TaskID:   task.TaskID,

@@ -41,7 +41,7 @@ examples/query/main.go
 ### Code Walkthrough
 
 ```go
-// 1. Client without custom options — defaults: 5 min timeout, powershell.exe
+// 1. Client without custom options — defaults: 30s timeout per command, powershell.exe
 client, err := psadt.NewClient()
 
 // 2. GetEnvironment — works WITHOUT a session (direct PS variable access)
@@ -193,7 +193,7 @@ examples/query/main.go
 ### Walkthrough do Código
 
 ```go
-// 1. Client sem opções customizadas — padrões: timeout 5 min, powershell.exe
+// 1. Client sem opções customizadas — padrões: timeout 30s por comando, powershell.exe
 client, err := psadt.NewClient()
 
 // 2. GetEnvironment — funciona SEM sessão (acesso direto às variáveis PS)

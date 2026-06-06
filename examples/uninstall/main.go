@@ -56,11 +56,24 @@ func main() {
 		log.Fatalf("Uninstallation failed: %v", err)
 	}
 
+	// Verify no leftover registry keys with typed access
+	_, err = session.GetRegistryKeyString(`HKLM\SOFTWARE\Contoso\WidgetPro`, "Version")
+	if err != nil {
+		log.Printf("Note: registry key already removed (expected)")
+	} else {
+		log.Printf("WARNING: registry key still present")
+	}
+
 	// Clean up registry
 	if err := session.RemoveRegistryKey(types.RemoveRegistryKeyOptions{
 		Key: `HKLM\SOFTWARE\Contoso\WidgetPro`,
 	}); err != nil {
 		log.Printf("Registry cleanup failed: %v", err)
+	}
+
+	// Structured logging
+	if err := session.WriteLogEntryWarning("Widget Pro uninstalled, registry cleaned up", "Uninstaller"); err != nil {
+		log.Printf("Log write failed: %v", err)
 	}
 
 	fmt.Println("Uninstallation completed successfully!")
