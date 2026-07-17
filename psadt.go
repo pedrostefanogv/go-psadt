@@ -33,6 +33,10 @@ type Client struct {
 	minVersion string
 	timeout    time.Duration
 
+	// Preserved from original options so Reconnect can restore the same config.
+	psPath         string
+	usePowerShell7 bool
+
 	envMu       sync.Mutex
 	envCache    *types.EnvironmentInfo
 	envCachedAt time.Time
@@ -87,6 +91,14 @@ func WithPowerShell7() Option {
 	}
 }
 
+// WithEnvCacheTTL sets the TTL for the GetEnvironment cache.
+// Set to 0 to disable caching.
+func WithEnvCacheTTL(ttl time.Duration) Option {
+	return func(c *clientConfig) {
+		c.envCacheTTL = ttl
+	}
+}
+
 // NewClient creates a new PSADT client, starting a PowerShell process,
 // importing the module, and validating the version.
 func NewClient(opts ...Option) (*Client, error) {
@@ -115,12 +127,17 @@ func NewClient(opts ...Option) (*Client, error) {
 	}
 
 	client := &Client{
-		runner:      r,
-		logger:      cfg.logger,
-		moduleName:  cfg.moduleName,
-		minVersion:  cfg.minVersion,
-		timeout:     cfg.timeout,
-		envCacheTTL: defaultEnvCacheTTL,
+		runner:         r,
+		logger:         cfg.logger,
+		moduleName:     cfg.moduleName,
+		minVersion:     cfg.minVersion,
+		timeout:        cfg.timeout,
+		psPath:         cfg.psPath,
+		usePowerShell7: cfg.usePowerShell7,
+		envCacheTTL:    cfg.envCacheTTL,
+	}
+	if client.envCacheTTL == 0 {
+		client.envCacheTTL = defaultEnvCacheTTL
 	}
 
 	ctx := context.Background()
@@ -169,7 +186,9 @@ func (c *Client) Reconnect(ctx context.Context) error {
 	}
 
 	cfg := runner.Config{
-		Timeout: c.timeout,
+		PSPath:         c.psPath,
+		Timeout:        c.timeout,
+		UsePowerShell7: c.usePowerShell7,
 	}
 
 	r, err := runner.New(cfg)
@@ -206,11 +225,4 @@ func (c *Client) InvalidateEnvCache() {
 	c.envCache = nil
 	c.envCachedAt = time.Time{}
 	c.envMu.Unlock()
-}
-
-// WithEnvCacheTTL sets the TTL for the environment cache. Set to 0 to disable caching.
-func WithEnvCacheTTL(ttl time.Duration) Option {
-	return func(c *clientConfig) {
-		c.envCacheTTL = ttl
-	}
 }

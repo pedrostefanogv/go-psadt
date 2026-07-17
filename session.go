@@ -6,6 +6,8 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
+	"sync/atomic"
 
 	"github.com/pedrostefanogv/go-psadt/internal/cmdbuilder"
 	"github.com/pedrostefanogv/go-psadt/internal/parser"
@@ -21,11 +23,12 @@ import (
 // callers can control deadlines/cancellation for an entire sequence of
 // operations without passing ctx to each method individually.
 type Session struct {
-	client *Client
-	runner *runner.Runner
-	config types.SessionConfig
-	ctx    context.Context // embedded context; nil means use default
-	closed bool
+	client  *Client
+	runner  *runner.Runner
+	config  types.SessionConfig
+	ctx     context.Context // embedded context; nil means use default
+	closed  atomic.Bool
+	closeFn sync.Once
 }
 
 // WithContext returns a shallow copy of the session that uses the given
@@ -37,13 +40,14 @@ type Session struct {
 //	defer cancel()
 //	results, err := session.WithContext(ctx).GetApplication(opts)
 func (s *Session) WithContext(ctx context.Context) *Session {
-	return &Session{
+	cp := &Session{
 		client: s.client,
 		runner: s.runner,
 		config: s.config,
 		ctx:    ctx,
-		closed: s.closed,
 	}
+	cp.closed.Store(s.closed.Load())
+	return cp
 }
 
 // OpenSession opens a new ADT deployment session with the given configuration.
@@ -89,26 +93,30 @@ func (s *Session) Close(exitCode int) error {
 
 // CloseWithContext closes the ADT session with an explicit context.
 func (s *Session) CloseWithContext(ctx context.Context, exitCode int) error {
-	if s.closed {
+	if s.closed.Load() {
 		return nil
 	}
 
-	cmd := fmt.Sprintf("Close-ADTSession -ExitCode %d", exitCode)
-	s.client.logger.Debug("closing ADT session", "exitCode", exitCode)
+	var resultErr error
+	s.closeFn.Do(func() {
+		s.closed.Store(true)
+		cmd := fmt.Sprintf("Close-ADTSession -ExitCode %d", exitCode)
+		s.client.logger.Debug("closing ADT session", "exitCode", exitCode)
 
-	_, err := s.runner.ExecuteVoid(ctx, cmd)
-	s.closed = true
+		_, err := s.runner.ExecuteVoid(ctx, cmd)
 
-	if err != nil {
-		if isExpectedSessionCloseRunnerTermination(err) {
-			s.client.logger.Info("ADT session closed and PowerShell runner exited", "exitCode", exitCode)
-			return nil
+		if err != nil {
+			if isExpectedSessionCloseRunnerTermination(err) {
+				s.client.logger.Info("ADT session closed and PowerShell runner exited", "exitCode", exitCode)
+				return
+			}
+			resultErr = fmt.Errorf("failed to close ADT session: %w", err)
+			return
 		}
-		return fmt.Errorf("failed to close ADT session: %w", err)
-	}
 
-	s.client.logger.Info("ADT session closed", "exitCode", exitCode)
-	return nil
+		s.client.logger.Info("ADT session closed", "exitCode", exitCode)
+	})
+	return resultErr
 }
 
 func isExpectedSessionCloseRunnerTermination(err error) bool {
@@ -169,7 +177,7 @@ func (s *Session) getContext() (context.Context, context.CancelFunc) {
 	if s.ctx != nil {
 		return context.WithCancel(s.ctx)
 	}
-	return s.getContext()
+	return s.client.defaultContext()
 }
 
 // LiveOutput returns a channel that receives live stdout/stderr lines from

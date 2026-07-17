@@ -53,8 +53,8 @@ func (s *Session) ExecuteRawVoidScript(ctx context.Context, script string) error
 func (s *Session) GetRegistryKeyString(key, name string) (string, error) {
 	ctx, cancel := s.getContext()
 	defer cancel()
-	cmd := fmt.Sprintf("(Get-ADTRegistryKey -Key %s -Name %s).%s",
-		escapeArg(key), escapeArg(name), escapeArg(name))
+	cmd := fmt.Sprintf("(Get-ADTRegistryKey -Key %s -Name %s).Value",
+		escapeArg(key), escapeArg(name))
 	data, err := s.execute(ctx, cmd)
 	if err != nil {
 		return "", err
@@ -67,8 +67,8 @@ func (s *Session) GetRegistryKeyString(key, name string) (string, error) {
 func (s *Session) GetRegistryKeyDWord(key, name string) (uint32, error) {
 	ctx, cancel := s.getContext()
 	defer cancel()
-	cmd := fmt.Sprintf("(Get-ADTRegistryKey -Key %s -Name %s).%s",
-		escapeArg(key), escapeArg(name), escapeArg(name))
+	cmd := fmt.Sprintf("(Get-ADTRegistryKey -Key %s -Name %s).Value",
+		escapeArg(key), escapeArg(name))
 	data, err := s.execute(ctx, cmd)
 	if err != nil {
 		return 0, err

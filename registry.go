@@ -86,8 +86,8 @@ func (s *Session) ConvertRegistryPath(registryPath string, toShort bool) (*types
 func (s *Session) GetRegistryKeyMultiString(key, name string) ([]string, error) {
 	ctx, cancel := s.getContext()
 	defer cancel()
-	cmd := fmt.Sprintf("(Get-ADTRegistryKey -Key %s -Name %s).%s",
-		escapeArg(key), escapeArg(name), escapeArg(name))
+	cmd := fmt.Sprintf("(Get-ADTRegistryKey -Key %s -Name %s).Value",
+		escapeArg(key), escapeArg(name))
 	data, err := s.execute(ctx, cmd)
 	if err != nil {
 		return nil, err
@@ -104,8 +104,8 @@ func (s *Session) GetRegistryKeyMultiString(key, name string) ([]string, error) 
 func (s *Session) GetRegistryKeyBinary(key, name string) ([]byte, error) {
 	ctx, cancel := s.getContext()
 	defer cancel()
-	cmd := fmt.Sprintf("(Get-ADTRegistryKey -Key %s -Name %s).%s",
-		escapeArg(key), escapeArg(name), escapeArg(name))
+	cmd := fmt.Sprintf("(Get-ADTRegistryKey -Key %s -Name %s).Value",
+		escapeArg(key), escapeArg(name))
 	data, err := s.execute(ctx, cmd)
 	if err != nil {
 		return nil, err
@@ -122,8 +122,8 @@ func (s *Session) GetRegistryKeyBinary(key, name string) ([]byte, error) {
 func (s *Session) GetRegistryKeyQWord(key, name string) (uint64, error) {
 	ctx, cancel := s.getContext()
 	defer cancel()
-	cmd := fmt.Sprintf("(Get-ADTRegistryKey -Key %s -Name %s).%s",
-		escapeArg(key), escapeArg(name), escapeArg(name))
+	cmd := fmt.Sprintf("(Get-ADTRegistryKey -Key %s -Name %s).Value",
+		escapeArg(key), escapeArg(name))
 	data, err := s.execute(ctx, cmd)
 	if err != nil {
 		return 0, err

@@ -10,6 +10,8 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"syscall"
 	"time"
 )
 
@@ -57,6 +59,10 @@ type Runner struct {
 	// The channel is closed when the runner stops.
 	liveOutputCh chan string
 
+	// closing is set atomically before the live output channel is closed,
+	// preventing sends on a closed channel from drainStderr or emitOutput.
+	closing atomic.Bool
+
 	// onOutput is an optional synchronous callback for each output line.
 	onOutput func(line string)
 }
@@ -97,6 +103,13 @@ func (r *Runner) start() error {
 		"-OutputFormat", "Text",
 		"-Command", "-",
 	)
+
+	// Prevent console flash when running from GUI apps (e.g., Discovery Agent).
+	// HideWindow + CREATE_NO_WINDOW avoids transient PowerShell windows.
+	r.cmd.SysProcAttr = &syscall.SysProcAttr{
+		HideWindow:    true,
+		CreationFlags: 0x08000000, // CREATE_NO_WINDOW
+	}
 
 	// Set up encoding for UTF-8
 	r.cmd.Env = append(r.cmd.Environ(),
@@ -159,6 +172,9 @@ func (r *Runner) drainStderr() {
 	scanner := bufio.NewScanner(r.stderr)
 	for scanner.Scan() {
 		line := scanner.Text()
+		if r.closing.Load() {
+			return
+		}
 		select {
 		case r.liveOutputCh <- line:
 		default:
@@ -180,6 +196,10 @@ func (r *Runner) Stop() error {
 	}
 
 	r.running = false
+
+	// Signal closing before closing the channel so drainStderr/emitOutput
+	// can avoid sending on a closed channel.
+	r.closing.Store(true)
 
 	// Close the live output channel
 	close(r.liveOutputCh)

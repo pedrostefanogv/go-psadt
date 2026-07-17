@@ -88,29 +88,32 @@ func (r *Runner) readResponse(ctx context.Context) ([]byte, error) {
 	// Channel for receiving scanned lines
 	lineCh := make(chan scanResult, 1)
 
+	// Single goroutine reads all lines sequentially, avoiding leaks on timeout/cancel.
+	go func() {
+		for scanner.Scan() {
+			lineCh <- scanResult{line: scanner.Text()}
+		}
+		if err := scanner.Err(); err != nil {
+			lineCh <- scanResult{err: err}
+			return
+		}
+		lineCh <- scanResult{eof: true}
+	}()
+
 	var jsonLines []string
 	inResponse := false
 
 	for {
-		// Read next line with timeout
-		go func() {
-			if scanner.Scan() {
-				lineCh <- scanResult{line: scanner.Text()}
-			} else {
-				if err := scanner.Err(); err != nil {
-					lineCh <- scanResult{err: err}
-					return
-				}
-				lineCh <- scanResult{eof: true}
-			}
-		}()
-
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		case <-time.After(timeout):
 			return nil, fmt.Errorf("timeout waiting for PowerShell response after %v", timeout)
-		case result := <-lineCh:
+		case result, ok := <-lineCh:
+			if !ok {
+				r.running = false
+				return nil, fmt.Errorf("PowerShell process ended before completing response")
+			}
 			if result.eof {
 				r.running = false
 				return nil, fmt.Errorf("PowerShell process ended before completing response")
@@ -151,6 +154,9 @@ func (r *Runner) readResponse(ctx context.Context) ([]byte, error) {
 // emitOutput sends a line to both the live output channel and the OnOutput callback.
 func (r *Runner) emitOutput(line string) {
 	if line == "" {
+		return
+	}
+	if r.closing.Load() {
 		return
 	}
 	select {
