@@ -55,6 +55,12 @@ func (r *Runner) executeWrapped(ctx context.Context, wrappedCmd string) ([]byte,
 		return nil, fmt.Errorf("PowerShell runner is not running")
 	}
 
+	// Verifica ctx antes de escrever — evita escrever em stdin de um processo
+	// que nunca será lido se o ctx já estiver cancelado.
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	// Write command to stdin
 	_, err := fmt.Fprintln(r.stdin, wrappedCmd)
 	if err != nil {
@@ -73,10 +79,20 @@ func (r *Runner) readResponse(ctx context.Context) ([]byte, error) {
 		return nil, fmt.Errorf("stdout scanner not initialized")
 	}
 
-	// Apply timeout from context or default
+	// Calcula o timeout: usa deadline do ctx se houver, senão r.timeout.
+	// Se r.timeout for 0, usa defaultTimeout (30s) como fallback.
 	timeout := r.timeout
+	if timeout <= 0 {
+		timeout = defaultTimeout
+	}
 	if deadline, ok := ctx.Deadline(); ok {
-		timeout = time.Until(deadline)
+		if remaining := time.Until(deadline); remaining < timeout {
+			timeout = remaining
+		}
+	}
+	// Garante timeout positivo mesmo se ctx não tiver deadline.
+	if timeout <= 0 {
+		timeout = defaultTimeout
 	}
 
 	type scanResult struct {
@@ -85,19 +101,37 @@ func (r *Runner) readResponse(ctx context.Context) ([]byte, error) {
 		eof  bool
 	}
 
-	// Channel for receiving scanned lines
-	lineCh := make(chan scanResult, 1)
+	// Buffer 64 evita bloqueio quando o PowerShell emite muitas linhas
+	// não-marker (logs PSADT) entre o BeginMarker e o EndMarker.
+	// O buffer 1 original causava goroutine leak quando o select principal
+	// saía por timeout/cancel antes de ler os resultados.
+	lineCh := make(chan scanResult, 64)
 
-	// Single goroutine reads all lines sequentially, avoiding leaks on timeout/cancel.
+	// Goroutine de scan com proteção anti-leak:
+	// - defer close(lineCh) garante que o select principal NUNCA fica
+	//   esperando em um channel que não será mais escrito.
+	// - O select interno no sender permite que a goroutine saia quando
+	//   o ctx é cancelado, evitando goroutine leak.
 	go func() {
+		defer close(lineCh)
 		for scanner.Scan() {
-			lineCh <- scanResult{line: scanner.Text()}
+			select {
+			case lineCh <- scanResult{line: scanner.Text()}:
+			case <-ctx.Done():
+				return
+			}
 		}
 		if err := scanner.Err(); err != nil {
-			lineCh <- scanResult{err: err}
+			select {
+			case lineCh <- scanResult{err: err}:
+			case <-ctx.Done():
+			}
 			return
 		}
-		lineCh <- scanResult{eof: true}
+		select {
+		case lineCh <- scanResult{eof: true}:
+		case <-ctx.Done():
+		}
 	}()
 
 	var jsonLines []string

@@ -36,6 +36,7 @@ type Client struct {
 	// Preserved from original options so Reconnect can restore the same config.
 	psPath         string
 	usePowerShell7 bool
+	initTimeout    time.Duration
 
 	envMu       sync.Mutex
 	envCache    *types.EnvironmentInfo
@@ -51,6 +52,7 @@ type clientConfig struct {
 	moduleName     string
 	minVersion     string
 	timeout        time.Duration
+	initTimeout    time.Duration
 	logger         *slog.Logger
 	usePowerShell7 bool
 	envCacheTTL    time.Duration
@@ -99,9 +101,37 @@ func WithEnvCacheTTL(ttl time.Duration) Option {
 	}
 }
 
+// WithInitTimeout sets the timeout for the initialization phase
+// (Import-Module + CheckModuleVersion). Default: 2 minutes.
+// Use this when Import-Module PSAppDeployToolkit may take longer
+// (e.g., first run with JIT compilation, antivirus scanning).
+func WithInitTimeout(timeout time.Duration) Option {
+	return func(c *clientConfig) {
+		c.initTimeout = timeout
+	}
+}
+
+// defaultInitTimeout is the fallback timeout for Import-Module + CheckModuleVersion
+// when WithInitTimeout is not specified and the ctx has no deadline.
+const defaultInitTimeout = 2 * time.Minute
+
 // NewClient creates a new PSADT client, starting a PowerShell process,
 // importing the module, and validating the version.
+// Uses context.Background() for initialization — prefer NewClientWithContext
+// when you need a deadline on Import-Module.
 func NewClient(opts ...Option) (*Client, error) {
+	return NewClientWithContext(context.Background(), opts...)
+}
+
+// NewClientWithContext creates a new PSADT client with an explicit context.
+// The ctx is used for the initialization phase (Import-Module + CheckModuleVersion).
+// If ctx has a deadline, Import-Module will respect it and return an error
+// instead of blocking indefinitely when PowerShell is unresponsive.
+//
+// Use WithInitTimeout to set a dedicated timeout for initialization;
+// otherwise the ctx deadline is used directly. If neither is set,
+// defaultInitTimeout (2 minutes) is used as fallback.
+func NewClientWithContext(ctx context.Context, opts ...Option) (*Client, error) {
 	cfg := &clientConfig{
 		moduleName: defaultModuleName,
 		minVersion: defaultMinVersion,
@@ -134,24 +164,38 @@ func NewClient(opts ...Option) (*Client, error) {
 		timeout:        cfg.timeout,
 		psPath:         cfg.psPath,
 		usePowerShell7: cfg.usePowerShell7,
+		initTimeout:    cfg.initTimeout,
 		envCacheTTL:    cfg.envCacheTTL,
 	}
 	if client.envCacheTTL == 0 {
 		client.envCacheTTL = defaultEnvCacheTTL
 	}
 
-	ctx := context.Background()
+	// ── Init phase with explicit context ──
+	// Priority: WithInitTimeout > ctx deadline > defaultInitTimeout (2min).
+	// This guarantees Import-Module never blocks indefinitely even if the
+	// caller passes a context without deadline and doesn't set WithInitTimeout.
+	initCtx := ctx
+	var initCancel context.CancelFunc
+	if cfg.initTimeout > 0 {
+		initCtx, initCancel = context.WithTimeout(ctx, cfg.initTimeout)
+		defer initCancel()
+	} else if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+		// Fallback: ctx sem deadline e sem WithInitTimeout → usa defaultInitTimeout
+		initCtx, initCancel = context.WithTimeout(ctx, defaultInitTimeout)
+		defer initCancel()
+	}
 
 	// Import the PSADT module
 	cfg.logger.Debug("importing PSADT module", "module", cfg.moduleName)
-	if err := r.ImportModule(ctx, cfg.moduleName); err != nil {
+	if err := r.ImportModule(initCtx, cfg.moduleName); err != nil {
 		r.Stop()
 		return nil, fmt.Errorf("failed to import module %s: %w", cfg.moduleName, err)
 	}
 
 	// Check module version
 	cfg.logger.Debug("checking module version", "minVersion", cfg.minVersion)
-	version, err := r.CheckModuleVersion(ctx, cfg.moduleName, cfg.minVersion)
+	version, err := r.CheckModuleVersion(initCtx, cfg.moduleName, cfg.minVersion)
 	if err != nil {
 		r.Stop()
 		return nil, fmt.Errorf("module version check failed: %w", err)
@@ -198,8 +242,16 @@ func (c *Client) Reconnect(ctx context.Context) error {
 
 	c.runner = r
 
+	// Use initTimeout if configured, otherwise use ctx as-is.
+	initCtx := ctx
+	var initCancel context.CancelFunc
+	if c.initTimeout > 0 {
+		initCtx, initCancel = context.WithTimeout(ctx, c.initTimeout)
+		defer initCancel()
+	}
+
 	// Re-import module
-	if err := r.ImportModule(ctx, c.moduleName); err != nil {
+	if err := r.ImportModule(initCtx, c.moduleName); err != nil {
 		c.runner = nil
 		return fmt.Errorf("failed to re-import module %s: %w", c.moduleName, err)
 	}

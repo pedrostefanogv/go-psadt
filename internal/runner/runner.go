@@ -184,6 +184,14 @@ func (r *Runner) drainStderr() {
 			r.onOutput(line)
 		}
 	}
+	// Verifica erro do scanner após o loop — evita warning scannererr
+	// e garante que erros de I/O no stderr não sejam silenciosamente ignorados.
+	if err := scanner.Err(); err != nil && !r.closing.Load() {
+		select {
+		case r.liveOutputCh <- fmt.Sprintf("[stderr scanner error] %v", err):
+		default:
+		}
+	}
 }
 
 // Stop gracefully stops the PowerShell process.
