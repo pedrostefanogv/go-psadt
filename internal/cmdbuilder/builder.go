@@ -183,6 +183,8 @@ func formatSliceParam(name string, v reflect.Value) string {
 }
 
 // formatMapParam formats a map parameter as a PS hashtable.
+// Keys and values that are already PowerShell literals (booleans, numbers, variables)
+// are emitted without quotes to preserve type fidelity.
 func formatMapParam(name string, v reflect.Value) string {
 	if v.IsNil() || v.Len() == 0 {
 		return ""
@@ -191,7 +193,25 @@ func formatMapParam(name string, v reflect.Value) string {
 	pairs := make([]string, 0, v.Len())
 	for _, key := range v.MapKeys() {
 		val := v.MapIndex(key)
-		pairs = append(pairs, fmt.Sprintf("%s=%s", EscapeString(fmt.Sprintf("%v", key.Interface())), EscapeString(fmt.Sprintf("%v", val.Interface()))))
+		keyStr := fmt.Sprintf("%v", key.Interface())
+		valStr := fmt.Sprintf("%v", val.Interface())
+
+		// Use the underlying elem kind for interface{} values
+		valKind := val.Kind()
+		if valKind == reflect.Interface && !val.IsNil() {
+			valKind = val.Elem().Kind()
+		}
+
+		switch valKind {
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+			reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+			reflect.Float32, reflect.Float64:
+			pairs = append(pairs, fmt.Sprintf("%s=%s", EscapeString(keyStr), valStr))
+		case reflect.Bool:
+			pairs = append(pairs, fmt.Sprintf("%s=%s", EscapeString(keyStr), EscapeString(valStr)))
+		default:
+			pairs = append(pairs, fmt.Sprintf("%s=%s", EscapeString(keyStr), EscapeString(valStr)))
+		}
 	}
 
 	return fmt.Sprintf("-%s @{%s}", name, strings.Join(pairs, "; "))

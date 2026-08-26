@@ -5,6 +5,7 @@ package psadt
 import (
 	"context"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/pedrostefanogv/go-psadt/internal/parser"
@@ -45,6 +46,17 @@ func (s *Session) ExecuteRawVoidScript(ctx context.Context, script string) error
 	s.client.logger.Debug("executing raw void script", "length", len(script))
 	_, err := s.runner.ExecuteVoid(ctx, script)
 	return err
+}
+
+// ExecuteRawScriptReader runs a PowerShell script from an io.Reader.
+// This is useful for very large scripts that should not be loaded entirely
+// into memory as a string.
+func (s *Session) ExecuteRawScriptReader(ctx context.Context, reader io.Reader) ([]byte, error) {
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read script: %w", err)
+	}
+	return s.ExecuteRawScript(ctx, string(data))
 }
 
 // GetRegistryKeyString is a typed version of GetRegistryKey that returns a

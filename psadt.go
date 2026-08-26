@@ -242,11 +242,16 @@ func (c *Client) Reconnect(ctx context.Context) error {
 
 	c.runner = r
 
-	// Use initTimeout if configured, otherwise use ctx as-is.
+	// Use initTimeout if configured, otherwise use ctx as-is with a fallback.
+	// Without a fallback, Import-Module could hang indefinitely if the caller
+	// passes a context.Background() or ctx without deadline.
 	initCtx := ctx
 	var initCancel context.CancelFunc
 	if c.initTimeout > 0 {
 		initCtx, initCancel = context.WithTimeout(ctx, c.initTimeout)
+		defer initCancel()
+	} else if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+		initCtx, initCancel = context.WithTimeout(ctx, defaultInitTimeout)
 		defer initCancel()
 	}
 

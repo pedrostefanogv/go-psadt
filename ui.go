@@ -65,7 +65,11 @@ func (s *Session) CloseInstallationProgress() error {
 func (s *Session) ShowInstallationRestartPrompt(opts types.RestartPromptOptions) error {
 	ctx, cancel := s.getContext()
 	defer cancel()
-	cmd := cmdbuilder.Build("Show-ADTInstallationRestartPrompt", opts)
+	normalizedOpts, err := normalizeRestartPromptOptions(opts)
+	if err != nil {
+		return err
+	}
+	cmd := cmdbuilder.Build("Show-ADTInstallationRestartPrompt", normalizedOpts)
 	return s.executeVoid(ctx, cmd)
 }
 
@@ -140,6 +144,16 @@ func normalizeProgressOptions(opts types.ProgressOptions) (types.ProgressOptions
 	}
 	if opts.InPlace {
 		return opts, fmt.Errorf("progress option InPlace is not supported by Show-ADTInstallationProgress in current PSADT")
+	}
+	return opts, nil
+}
+
+func normalizeRestartPromptOptions(opts types.RestartPromptOptions) (types.RestartPromptOptions, error) {
+	if opts.TopMost && opts.NotTopMost {
+		return opts, fmt.Errorf("restart prompt options TopMost and NotTopMost cannot both be true")
+	}
+	if opts.SilentRestart && opts.NoCountdown {
+		return opts, fmt.Errorf("restart prompt options SilentRestart and NoCountdown cannot both be true")
 	}
 	return opts, nil
 }

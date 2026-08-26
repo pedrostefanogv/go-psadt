@@ -4,6 +4,7 @@ package parser
 
 import (
 	"fmt"
+	"strings"
 )
 
 // PSADTError represents an error returned by a PSADT PowerShell command.
@@ -73,4 +74,64 @@ func IsRebootRequired(err error) bool {
 // IsUserCancelled checks if the error indicates the user cancelled.
 func IsUserCancelled(err error) bool {
 	return IsExitCode(err, 1602)
+}
+
+// IsAccessDenied checks if the error indicates access was denied.
+func IsAccessDenied(err error) bool {
+	if IsExitCode(err, 5) {
+		return true
+	}
+	psErr, ok := IsPSADTError(err)
+	if !ok {
+		return false
+	}
+	return psErr.Type == "System.UnauthorizedAccessException"
+}
+
+// IsTimeout checks if the error indicates a timeout occurred.
+func IsTimeout(err error) bool {
+	if psErr, ok := IsPSADTError(err); ok {
+		return psErr.Type == "System.TimeoutException"
+	}
+	// Also check context deadline exceeded
+	if err != nil {
+		msg := err.Error()
+		return containsAny(msg, "timeout", "deadline exceeded", "context deadline exceeded")
+	}
+	return false
+}
+
+// IsFileNotFound checks if the error indicates a file was not found.
+func IsFileNotFound(err error) bool {
+	if psErr, ok := IsPSADTError(err); ok {
+		return psErr.Type == "System.IO.FileNotFoundException" ||
+			psErr.Type == "System.Management.Automation.ItemNotFoundException"
+	}
+	if err != nil {
+		msg := err.Error()
+		return containsAny(msg, "file not found", "cannot find path", "does not exist")
+	}
+	return false
+}
+
+// IsNetworkError checks if the error indicates a network-related failure.
+func IsNetworkError(err error) bool {
+	psErr, ok := IsPSADTError(err)
+	if !ok {
+		return false
+	}
+	return psErr.Type == "System.Net.WebException" ||
+		psErr.Type == "System.Net.HttpRequestException" ||
+		psErr.Type == "System.Net.Sockets.SocketException"
+}
+
+// containsAny checks if s contains any of the given substrings (case-insensitive).
+func containsAny(s string, substrs ...string) bool {
+	lower := strings.ToLower(s)
+	for _, sub := range substrs {
+		if strings.Contains(lower, strings.ToLower(sub)) {
+			return true
+		}
+	}
+	return false
 }

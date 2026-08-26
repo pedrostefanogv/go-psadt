@@ -25,6 +25,15 @@ func (s *Session) TestBattery() (*types.BatteryInfo, error) {
 	return &result, nil
 }
 
+// TestIsLaptop checks if the system is a laptop (convenience wrapper around TestBattery).
+func (s *Session) TestIsLaptop() (bool, error) {
+	info, err := s.TestBattery()
+	if err != nil {
+		return false, err
+	}
+	return info.IsLaptop, nil
+}
+
 // TestCallerIsAdmin checks if the current user has admin privileges.
 func (s *Session) TestCallerIsAdmin() (bool, error) {
 	ctx, cancel := s.getContext()

@@ -16,8 +16,8 @@ type ADTStringTable struct {
 
 // DeferHistory represents defer history.
 type DeferHistory struct {
-	DeferTimesRemaining int    `json:"DeferTimesRemaining"`
-	DeferDeadline       string `json:"DeferDeadline"`
+	DeferTimesRemaining int    `json:"DeferTimesRemaining" ps:"DeferTimesRemaining"`
+	DeferDeadline       string `json:"DeferDeadline" ps:"DeferDeadline"`
 }
 
 // SendKeysOptions options for Send-ADTKeys.

@@ -22,6 +22,12 @@ import (
 // (if set via WithContext) or the Client's default timeout. This means
 // callers can control deadlines/cancellation for an entire sequence of
 // operations without passing ctx to each method individually.
+//
+// Lifecycle hooks allow callers to react to session events:
+//
+//	session.OnClose(func(exitCode int) {
+//	    log.Printf("Session closed with exit %d", exitCode)
+//	})
 type Session struct {
 	client  *Client
 	runner  *runner.Runner
@@ -29,6 +35,54 @@ type Session struct {
 	ctx     context.Context // embedded context; nil means use default
 	closed  atomic.Bool
 	closeFn sync.Once
+
+	// Lifecycle hooks
+	onCloseHooks []func(exitCode int)
+	onErrorHooks []func(err error)
+	hooksMu      sync.Mutex
+}
+
+// OnClose registers a callback to be invoked when the session closes.
+// Multiple callbacks may be registered; they are executed in registration order.
+func (s *Session) OnClose(fn func(exitCode int)) {
+	s.hooksMu.Lock()
+	defer s.hooksMu.Unlock()
+	s.onCloseHooks = append(s.onCloseHooks, fn)
+}
+
+// OnError registers a callback to be invoked when a session method returns an error.
+// Multiple callbacks may be registered; they are executed in registration order.
+func (s *Session) OnError(fn func(err error)) {
+	s.hooksMu.Lock()
+	defer s.hooksMu.Unlock()
+	s.onErrorHooks = append(s.onErrorHooks, fn)
+}
+
+// fireOnClose executes all registered OnClose hooks.
+func (s *Session) fireOnClose(exitCode int) {
+	s.hooksMu.Lock()
+	hooks := make([]func(int), len(s.onCloseHooks))
+	copy(hooks, s.onCloseHooks)
+	s.hooksMu.Unlock()
+
+	for _, fn := range hooks {
+		fn(exitCode)
+	}
+}
+
+// fireOnError executes all registered OnError hooks.
+func (s *Session) fireOnError(err error) {
+	if err == nil {
+		return
+	}
+	s.hooksMu.Lock()
+	hooks := make([]func(error), len(s.onErrorHooks))
+	copy(hooks, s.onErrorHooks)
+	s.hooksMu.Unlock()
+
+	for _, fn := range hooks {
+		fn(err)
+	}
 }
 
 // WithContext returns a shallow copy of the session that uses the given
@@ -108,14 +162,20 @@ func (s *Session) CloseWithContext(ctx context.Context, exitCode int) error {
 		if err != nil {
 			if isExpectedSessionCloseRunnerTermination(err) {
 				s.client.logger.Info("ADT session closed and PowerShell runner exited", "exitCode", exitCode)
+				s.fireOnClose(exitCode)
 				return
 			}
 			resultErr = fmt.Errorf("failed to close ADT session: %w", err)
+			s.fireOnError(resultErr)
 			return
 		}
 
 		s.client.logger.Info("ADT session closed", "exitCode", exitCode)
+		s.fireOnClose(exitCode)
 	})
+	if resultErr != nil {
+		s.fireOnError(resultErr)
+	}
 	return resultErr
 }
 
@@ -157,7 +217,12 @@ func (s *Session) GetPropertiesWithContext(ctx context.Context) (*types.SessionP
 // execute is a helper that executes a command and returns raw bytes.
 func (s *Session) execute(ctx context.Context, cmd string) ([]byte, error) {
 	s.client.logger.Debug("executing command", "command", cmd)
-	return s.runner.Execute(ctx, cmd)
+	data, err := s.runner.Execute(ctx, cmd)
+	if err != nil {
+		s.fireOnError(err)
+		return nil, err
+	}
+	return data, nil
 }
 
 // executeVoid is a helper that executes a void command.
@@ -165,9 +230,14 @@ func (s *Session) executeVoid(ctx context.Context, cmd string) error {
 	s.client.logger.Debug("executing void command", "command", cmd)
 	data, err := s.runner.ExecuteVoid(ctx, cmd)
 	if err != nil {
+		s.fireOnError(err)
 		return err
 	}
-	return parser.CheckSuccess(data)
+	if checkErr := parser.CheckSuccess(data); checkErr != nil {
+		s.fireOnError(checkErr)
+		return checkErr
+	}
+	return nil
 }
 
 // getContext returns the session's embedded context if set, otherwise the
