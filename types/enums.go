@@ -185,3 +185,68 @@ const (
 
 // DialogMessageAlignment alias for PSADT parameter compatibility
 type DialogMessageAlignment = MessageAlignment
+// Valid reports whether v is one of the PSADT-accepted deployment types.
+func (v DeploymentType) Valid() bool {
+	switch v {
+	case DeployInstall, DeployUninstall, DeployRepair:
+		return true
+	}
+	return false
+}
+
+// Valid reports whether m is one of the PSADT-accepted deploy modes. The
+// zero value is treated as valid (PSADT defaults to Auto).
+func (m DeployMode) Valid() bool {
+	switch m {
+	case "", DeployModeAuto, DeployModeInteractive, DeployModeNonInteractive, DeployModeSilent:
+		return true
+	}
+	return false
+}
+
+// Valid reports whether a is one of the PSADT-accepted MSI actions.
+func (a MsiAction) Valid() bool {
+	switch a {
+	case MsiInstall, MsiUninstall, MsiPatch, MsiRepair, MsiActiveSetup:
+		return true
+	}
+	return false
+}
+
+// Valid reports whether s is one of the PSADT-accepted window styles. The
+// zero value is treated as valid (omitted from the command).
+func (s ProcessWindowStyle) Valid() bool {
+	switch s {
+	case "", WindowNormal, WindowHidden, WindowMaximized, WindowMinimized:
+		return true
+	}
+	return false
+}
+
+// Valid reports whether k is one of the PSADT-accepted registry value kinds.
+func (k RegistryValueKind) Valid() bool {
+	switch k {
+	case "", RegString, RegExpandString, RegBinary, RegDWord, RegMultiString, RegQWord:
+		return true
+	}
+	return false
+}
+
+// Valid reports whether i is one of the PSADT-accepted balloon/toast icons.
+func (i BalloonTipIcon) Valid() bool {
+	switch i {
+	case "", BalloonNone, BalloonInfo, BalloonWarning, BalloonError:
+		return true
+	}
+	return false
+}
+
+// Valid reports whether m is one of the PSADT-accepted message alignments.
+func (m MessageAlignment) Valid() bool {
+	switch m {
+	case "", AlignLeft, AlignCenter, AlignRight:
+		return true
+	}
+	return false
+}
+

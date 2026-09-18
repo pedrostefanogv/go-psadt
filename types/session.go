@@ -2,6 +2,11 @@
 
 package types
 
+import (
+	"errors"
+	"fmt"
+)
+
 // SessionConfig is the configuration for opening an ADT session.
 type SessionConfig struct {
 	AppVendor   string `ps:"AppVendor"`
@@ -247,3 +252,20 @@ func (b *SessionConfigBuilder) ScriptInfo(version, date, author string) *Session
 func (b *SessionConfigBuilder) Build() SessionConfig {
 	return b.cfg
 }
+// Validate checks the session configuration for compile-time-fixable mistakes
+// before any PowerShell round-trip happens (fail fast in Go, not in PSADT).
+// AppName is required; DeploymentType and DeployMode must hold PSADT-accepted
+// values (empty DeployMode means Auto).
+func (c SessionConfig) Validate() error {
+	if c.AppName == "" {
+		return errors.New("SessionConfig.AppName is required")
+	}
+	if !c.DeploymentType.Valid() {
+		return fmt.Errorf("SessionConfig.DeploymentType %q is invalid; use types.DeployInstall, DeployUninstall or DeployRepair", c.DeploymentType)
+	}
+	if !c.DeployMode.Valid() {
+		return fmt.Errorf("SessionConfig.DeployMode %q is invalid; use types.DeployModeAuto, Interactive, NonInteractive or Silent", c.DeployMode)
+	}
+	return nil
+}
+
