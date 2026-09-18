@@ -97,9 +97,12 @@ func TestReadResponse_EOF(t *testing.T) {
 		stdoutScanner: bufio.NewScanner(strings.NewReader("")),
 		running:       true,
 		timeout:       time.Second,
+		liveOutputCh:  make(chan string, 8),
+		outCh:         make(chan outLine, 8),
+		dead:          make(chan struct{}),
 	}
 
-	_, err := r.readResponse(context.Background())
+	_, err := r.readResponse(context.Background(), BeginMarker)
 	if err == nil {
 		t.Fatal("expected EOF error, got nil")
 	}

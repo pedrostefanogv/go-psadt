@@ -13,6 +13,8 @@ import (
 	"sync/atomic"
 	"syscall"
 	"time"
+
+	"github.com/pedrostefanogv/go-psadt/internal/parser"
 )
 
 const (
@@ -41,6 +43,15 @@ type Config struct {
 	// by PowerShell outside of JSON response markers. Set this to stream
 	// PSADT log output to the caller in real time during long operations.
 	OnOutput OutputLineCallback
+
+	// PreferPS7 tries pwsh.exe first and falls back to powershell.exe when
+	// PSPath is not explicitly set. UsePowerShell7 still wins when true.
+	PreferPS7 bool
+
+	// OnCommand is called after every command execution with the wrapped
+	// command, its duration and the resulting error (nil on success).
+	// It must not call back into the Runner (it runs outside the mutex).
+	OnCommand func(cmd string, duration time.Duration, err error)
 }
 
 // Runner manages a persistent PowerShell process.
@@ -63,15 +74,33 @@ type Runner struct {
 	// preventing sends on a closed channel from drainStderr or emitOutput.
 	closing atomic.Bool
 
+	// cmdSeq generates unique ids for per-command begin/end markers.
+	cmdSeq atomic.Uint64
+
+	// outCh carries marker-delimited stdout lines from the persistent pump.
+	outCh chan outLine
+	pumpOnce sync.Once
+	dead     chan struct{}
+
+	// desynced marks that a previous response timed out or was cancelled
+	// mid-stream, so leftover lines from that response may still be in the
+	// stdout pipe. readResponse discards lines until the next BeginMarker.
+	desynced bool
+
 	// onOutput is an optional synchronous callback for each output line.
 	onOutput func(line string)
+
+	// onCommand is the optional per-command metrics callback. Guarded by
+	// onCommandMu because it may be set after the runner started.
+	onCommandMu sync.RWMutex
+	onCommand   func(cmd string, duration time.Duration, err error)
 }
 
 // New creates and starts a new PowerShell runner.
 func New(cfg Config) (*Runner, error) {
 	psPath := cfg.PSPath
 	if psPath == "" {
-		psPath = detectPowerShell(cfg.UsePowerShell7)
+		psPath = detectPowerShell(cfg.UsePowerShell7 || cfg.PreferPS7)
 	}
 
 	timeout := cfg.Timeout
@@ -84,6 +113,11 @@ func New(cfg Config) (*Runner, error) {
 		psPath:       psPath,
 		onOutput:     cfg.OnOutput,
 		liveOutputCh: make(chan string, 256),
+		outCh:        make(chan outLine, 256),
+		dead:         make(chan struct{}),
+	}
+	if cfg.OnCommand != nil {
+		r.SetOnCommand(cfg.OnCommand)
 	}
 
 	if err := r.start(); err != nil {
@@ -144,7 +178,8 @@ func (r *Runner) start() error {
 
 	r.running = true
 
-	// Start background stderr reader that feeds into liveOutputCh
+	// Start the single persistent stdout pump and the stderr reader.
+	r.ensurePump()
 	go r.drainStderr()
 
 	// Set UTF-8 output encoding
@@ -206,8 +241,9 @@ func (r *Runner) Stop() error {
 	r.running = false
 
 	// Signal closing before closing the channel so drainStderr/emitOutput
-	// can avoid sending on a closed channel.
+	// and the stdout pump can avoid sending on closed channels.
 	r.closing.Store(true)
+	close(r.dead)
 
 	// Close the live output channel
 	close(r.liveOutputCh)
@@ -239,6 +275,25 @@ func (r *Runner) IsAlive() bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.running
+}
+
+// PID returns the process id of the running PowerShell process, or 0 when
+// the runner is not started. Used by Client.Abort to force-kill the whole
+// process tree (PowerShell plus any installer it spawned).
+func (r *Runner) PID() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.cmd == nil || r.cmd.Process == nil {
+		return 0
+	}
+	return r.cmd.Process.Pid
+}
+
+// SetOnCommand installs (or replaces) the per-command metrics callback.
+func (r *Runner) SetOnCommand(hook func(cmd string, duration time.Duration, err error)) {
+	r.onCommandMu.Lock()
+	defer r.onCommandMu.Unlock()
+	r.onCommand = hook
 }
 
 // LiveOutput returns a channel that receives every stdout/stderr line
@@ -287,7 +342,12 @@ func (r *Runner) CheckModuleVersion(ctx context.Context, moduleName, minVersion 
 		return "", err
 	}
 
-	return strings.TrimSpace(string(data)), nil
+	// Execute returns the raw envelope; extract the version from Data.
+	var version string
+	if err := parser.ParseResponse(data, &version); err != nil {
+		return "", fmt.Errorf("failed to parse module version response: %w", err)
+	}
+	return strings.TrimSpace(version), nil
 }
 
 // detectPowerShell finds the PowerShell executable.

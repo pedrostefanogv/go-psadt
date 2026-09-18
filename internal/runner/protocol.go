@@ -71,3 +71,48 @@ $m.Version.ToString()
 func HeartbeatCommand() string {
 	return "$true"
 }
+// WrapCommandWithID wraps a command like WrapCommand but tags the begin/end
+// markers with a unique command id. Tagged markers make the stream
+// self-describing: after a timeout, the next readResponse can discard every
+// line until the marker of ITS OWN command instead of resyncing on the first
+// BeginMarker — which may still belong to the timed-out response, because
+// PowerShell only emits the whole response (markers included) when the
+// command completes.
+func WrapCommandWithID(psCommand string, id uint64) string {
+	return fmt.Sprintf(`
+try {
+        $result = & {
+%s
+        }
+    $__out = @{ Success = $true; Data = $result; Error = $null } | ConvertTo-Json -Depth 10 -Compress
+} catch {
+    $__out = @{ Success = $false; Data = $null; Error = @{
+        Message = $_.Exception.Message
+        Type = $_.Exception.GetType().FullName
+        StackTrace = $_.ScriptStackTrace
+    }} | ConvertTo-Json -Depth 10 -Compress
+}
+Write-Output '<<<PSADT_BEGIN:%d>>>'
+Write-Output $__out
+Write-Output '<<<PSADT_END:%d>>>'
+`, psCommand, id, id)
+}
+
+// WrapVoidCommandWithID is WrapCommandWithID for commands with no return data.
+func WrapVoidCommandWithID(psCommand string, id uint64) string {
+	return fmt.Sprintf(`
+try {
+    %s
+    $__out = @{ Success = $true; Data = $null; Error = $null } | ConvertTo-Json -Depth 10 -Compress
+} catch {
+    $__out = @{ Success = $false; Data = $null; Error = @{
+        Message = $_.Exception.Message
+        Type = $_.Exception.GetType().FullName
+        StackTrace = $_.ScriptStackTrace
+    }} | ConvertTo-Json -Depth 10 -Compress
+}
+Write-Output '<<<PSADT_BEGIN:%d>>>'
+Write-Output $__out
+Write-Output '<<<PSADT_END:%d>>>'
+`, psCommand, id, id)
+}
