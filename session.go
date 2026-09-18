@@ -94,11 +94,22 @@ func (s *Session) fireOnError(err error) {
 //	defer cancel()
 //	results, err := session.WithContext(ctx).GetApplication(opts)
 func (s *Session) WithContext(ctx context.Context) *Session {
+	// Copy lifecycle hooks so callbacks registered on the original session
+	// (or on a previous copy) still fire for calls made through this copy.
+	s.hooksMu.Lock()
+	onClose := make([]func(int), len(s.onCloseHooks))
+	copy(onClose, s.onCloseHooks)
+	onErr := make([]func(error), len(s.onErrorHooks))
+	copy(onErr, s.onErrorHooks)
+	s.hooksMu.Unlock()
+
 	cp := &Session{
-		client: s.client,
-		runner: s.runner,
-		config: s.config,
-		ctx:    ctx,
+		client:       s.client,
+		runner:       s.runner,
+		config:       s.config,
+		ctx:          ctx,
+		onCloseHooks: onClose,
+		onErrorHooks: onErr,
 	}
 	cp.closed.Store(s.closed.Load())
 	return cp
@@ -114,11 +125,19 @@ func (c *Client) OpenSession(cfg types.SessionConfig) (*Session, error) {
 
 // OpenSessionWithContext opens a new ADT session with an explicit context.
 func (c *Client) OpenSessionWithContext(ctx context.Context, cfg types.SessionConfig) (*Session, error) {
+	// Fail fast on invalid configuration before any PowerShell round-trip.
+	if err := cfg.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid session config: %w", err)
+	}
+
 	cmd := cmdbuilder.Build("Open-ADTSession", cfg)
 	c.logger.Debug("opening ADT session", "command", cmd)
 
-	_, err := c.runner.ExecuteVoid(ctx, cmd)
+	rr, err := c.ensureAlive(ctx)
 	if err != nil {
+		return nil, fmt.Errorf("failed to open ADT session: %w", err)
+	}
+	if _, err := rr.ExecuteVoid(ctx, cmd); err != nil {
 		return nil, fmt.Errorf("failed to open ADT session: %w", err)
 	}
 
@@ -157,7 +176,13 @@ func (s *Session) CloseWithContext(ctx context.Context, exitCode int) error {
 		cmd := fmt.Sprintf("Close-ADTSession -ExitCode %d", exitCode)
 		s.client.logger.Debug("closing ADT session", "exitCode", exitCode)
 
-		_, err := s.runner.ExecuteVoid(ctx, cmd)
+		var err error
+		rr, rerr := s.client.ensureAlive(ctx)
+		if rerr != nil {
+			err = rerr
+		} else {
+			_, err = rr.ExecuteVoid(ctx, cmd)
+		}
 
 		if err != nil {
 			if isExpectedSessionCloseRunnerTermination(err) {
@@ -166,13 +191,14 @@ func (s *Session) CloseWithContext(ctx context.Context, exitCode int) error {
 				return
 			}
 			resultErr = fmt.Errorf("failed to close ADT session: %w", err)
-			s.fireOnError(resultErr)
 			return
 		}
 
 		s.client.logger.Info("ADT session closed", "exitCode", exitCode)
 		s.fireOnClose(exitCode)
 	})
+	// Hooks fire exactly once here — also firing inside closeFn.Do made
+	// OnError hooks registered by callers run twice.
 	if resultErr != nil {
 		s.fireOnError(resultErr)
 	}
@@ -201,7 +227,11 @@ func (s *Session) GetProperties() (*types.SessionProperties, error) {
 func (s *Session) GetPropertiesWithContext(ctx context.Context) (*types.SessionProperties, error) {
 	cmd := "Get-ADTSession | Select-Object CurrentDate,CurrentDateTime,CurrentTime,InstallPhase,LogPath,UseDefaultMsi,DeployAppScriptFriendlyName,DeployAppScriptParameters,DeployAppScriptVersion | ConvertTo-Json -Depth 5"
 
-	data, err := s.runner.Execute(ctx, cmd)
+	rr, err := s.client.ensureAlive(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get session properties: %w", err)
+	}
+	data, err := rr.Execute(ctx, cmd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get session properties: %w", err)
 	}
@@ -217,7 +247,12 @@ func (s *Session) GetPropertiesWithContext(ctx context.Context) (*types.SessionP
 // execute is a helper that executes a command and returns raw bytes.
 func (s *Session) execute(ctx context.Context, cmd string) ([]byte, error) {
 	s.client.logger.Debug("executing command", "command", cmd)
-	data, err := s.runner.Execute(ctx, cmd)
+	rr, err := s.client.ensureAlive(ctx)
+	if err != nil {
+		s.fireOnError(err)
+		return nil, err
+	}
+	data, err := rr.Execute(ctx, cmd)
 	if err != nil {
 		s.fireOnError(err)
 		return nil, err
@@ -228,7 +263,12 @@ func (s *Session) execute(ctx context.Context, cmd string) ([]byte, error) {
 // executeVoid is a helper that executes a void command.
 func (s *Session) executeVoid(ctx context.Context, cmd string) error {
 	s.client.logger.Debug("executing void command", "command", cmd)
-	data, err := s.runner.ExecuteVoid(ctx, cmd)
+	rr, err := s.client.ensureAlive(ctx)
+	if err != nil {
+		s.fireOnError(err)
+		return err
+	}
+	data, err := rr.ExecuteVoid(ctx, cmd)
 	if err != nil {
 		s.fireOnError(err)
 		return err
@@ -254,5 +294,9 @@ func (s *Session) getContext() (context.Context, context.CancelFunc) {
 // the PowerShell process in real time. Use this to stream PSADT log output
 // during long operations (e.g., installation progress).
 func (s *Session) LiveOutput() <-chan string {
-	return s.runner.LiveOutput()
+	r := s.runner
+	if s.client != nil && s.client.runner != nil {
+		r = s.client.runner
+	}
+	return r.LiveOutput()
 }

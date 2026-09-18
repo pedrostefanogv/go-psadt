@@ -3,6 +3,7 @@
 package psadt
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/pedrostefanogv/go-psadt/internal/cmdbuilder"
@@ -112,4 +113,52 @@ func (s *Session) ClearModuleCallback(hookPoint string) error {
 	defer cancel()
 	cmd := fmt.Sprintf("Clear-ADTModuleCallback -HookPoint %s", cmdbuilder.EscapeString(hookPoint))
 	return s.executeVoid(ctx, cmd)
+}
+// InitializeModule initializes the PSADT module lifecycle without opening a
+// full deployment session. Useful when a Go host wants PSADT environment
+// variables ($envProgramFiles, etc.) available for raw scripts before
+// Open-ADTSession. The SessionConfig fields DeploymentType/DeployMode and
+// the Log* fields are forwarded.
+func (c *Client) InitializeModule(cfg types.SessionConfig) error {
+	ctx, cancel := c.defaultContext()
+	defer cancel()
+	return c.InitializeModuleWithContext(ctx, cfg)
+}
+
+// InitializeModuleWithContext initializes the module with an explicit context.
+func (c *Client) InitializeModuleWithContext(ctx context.Context, cfg types.SessionConfig) error {
+	rr, err := c.ensureAlive(ctx)
+	if err != nil {
+		return err
+	}
+	cmd := cmdbuilder.Build("Initialize-ADTModule", cfg)
+	_, err = rr.ExecuteVoid(ctx, cmd)
+	if err != nil {
+		return fmt.Errorf("failed to initialize PSADT module: %w", err)
+	}
+	return nil
+}
+
+// InitializeModuleIfUninitialized initializes the module only when it is not
+// already initialized in the PowerShell process (idempotent).
+func (c *Client) InitializeModuleIfUninitialized(cfg types.SessionConfig) error {
+	ctx, cancel := c.defaultContext()
+	defer cancel()
+	return c.InitializeModuleIfUninitializedWithContext(ctx, cfg)
+}
+
+// InitializeModuleIfUninitializedWithContext initializes the module with an
+// explicit context, only when needed.
+func (c *Client) InitializeModuleIfUninitializedWithContext(ctx context.Context, cfg types.SessionConfig) error {
+	rr, err := c.ensureAlive(ctx)
+	if err != nil {
+		return err
+	}
+	cmd := fmt.Sprintf("Initialize-ADTModuleIfUninitialized -SessionState $ExecutionContext.SessionState")
+	_, err = rr.ExecuteVoid(ctx, cmd)
+	if err != nil {
+		return fmt.Errorf("failed to initialize PSADT module (if uninitialized): %w", err)
+	}
+	_ = cfg // kept for API symmetry; the idempotent variant takes no config
+	return nil
 }

@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/pedrostefanogv/go-psadt/internal/runner"
@@ -42,6 +43,20 @@ type Client struct {
 	envCache    *types.EnvironmentInfo
 	envCachedAt time.Time
 	envCacheTTL time.Duration
+
+	// autoPreferPS7 tries pwsh.exe before powershell.exe (fallback included).
+	autoPreferPS7 bool
+
+	// autoReconnect re-starts the PowerShell runner transparently when a
+	// command finds it dead. Recommended for long-running RMM agents.
+	autoReconnect bool
+
+	// Observability
+	createdAt    time.Time
+	commandCount atomic.Uint64
+	lastErrMu    sync.Mutex
+	lastErr      error
+	onCommand    func(cmd string, duration time.Duration, err error)
 }
 
 // Option configures a Client.
@@ -56,6 +71,9 @@ type clientConfig struct {
 	logger         *slog.Logger
 	usePowerShell7 bool
 	envCacheTTL    time.Duration
+	autoPreferPS7  bool
+	autoReconnect  bool
+	onCommand      func(cmd string, duration time.Duration, err error)
 }
 
 // WithPSPath sets the path to the PowerShell executable.
@@ -98,6 +116,33 @@ func WithPowerShell7() Option {
 func WithEnvCacheTTL(ttl time.Duration) Option {
 	return func(c *clientConfig) {
 		c.envCacheTTL = ttl
+	}
+}
+
+// WithAutoPreferPS7 selects pwsh.exe (PowerShell 7) when available and
+// falls back to powershell.exe (5.1). PSADT v4.1 works best on PS 7.
+// Ignored when WithPSPath or WithPowerShell7 is also used.
+func WithAutoPreferPS7() Option {
+	return func(c *clientConfig) {
+		c.autoPreferPS7 = true
+	}
+}
+
+// WithAutoReconnect makes every session/client operation transparently
+// restart the PowerShell runner (and re-import the PSADT module) when the
+// process is found dead. Recommended for long-running RMM agents.
+func WithAutoReconnect() Option {
+	return func(c *clientConfig) {
+		c.autoReconnect = true
+	}
+}
+
+// OnCommand registers a per-command observability hook invoked after every
+// PSADT command with the wrapped command, its duration and error (nil on
+// success). The hook must be fast and must not call back into the client.
+func OnCommand(hook func(cmd string, duration time.Duration, err error)) Option {
+	return func(c *clientConfig) {
+		c.onCommand = hook
 	}
 }
 
@@ -151,6 +196,7 @@ func NewClientWithContext(ctx context.Context, opts ...Option) (*Client, error) 
 		PSPath:         cfg.psPath,
 		Timeout:        cfg.timeout,
 		UsePowerShell7: cfg.usePowerShell7,
+		PreferPS7:      cfg.autoPreferPS7,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to start PowerShell runner: %w", err)
@@ -166,10 +212,17 @@ func NewClientWithContext(ctx context.Context, opts ...Option) (*Client, error) 
 		usePowerShell7: cfg.usePowerShell7,
 		initTimeout:    cfg.initTimeout,
 		envCacheTTL:    cfg.envCacheTTL,
+		autoPreferPS7:  cfg.autoPreferPS7,
+		autoReconnect:  cfg.autoReconnect,
+		onCommand:      cfg.onCommand,
+		createdAt:      time.Now(),
 	}
 	if client.envCacheTTL == 0 {
 		client.envCacheTTL = defaultEnvCacheTTL
 	}
+
+	// The runner hook feeds client observability and forwards to the user hook.
+	r.SetOnCommand(client.onRunnerCommand)
 
 	// ── Init phase with explicit context ──
 	// Priority: WithInitTimeout > ctx deadline > defaultInitTimeout (2min).
@@ -270,6 +323,65 @@ func (c *Client) Runner() *runner.Runner {
 	return c.runner
 }
 
+// Heartbeat verifies the underlying PowerShell process is responsive with a
+// full command round-trip.
+func (c *Client) Heartbeat(ctx context.Context) error {
+	rr, err := c.ensureAlive(ctx)
+	if err != nil {
+		return err
+	}
+	return rr.Heartbeat(ctx)
+}
+
+// CommandCount returns the total number of PSADT commands executed by this
+// client (including failed ones). Useful for observability in RMM agents.
+func (c *Client) CommandCount() uint64 {
+	return c.commandCount.Load()
+}
+
+// LastError returns the most recent error returned by a command, or nil.
+func (c *Client) LastError() error {
+	c.lastErrMu.Lock()
+	defer c.lastErrMu.Unlock()
+	return c.lastErr
+}
+
+// Uptime returns how long ago the client was created.
+func (c *Client) Uptime() time.Duration {
+	return time.Since(c.createdAt)
+}
+
+// ensureAlive returns a usable runner, transparently reconnecting when the
+// process died and WithAutoReconnect was enabled.
+func (c *Client) ensureAlive(ctx context.Context) (*runner.Runner, error) {
+	if c.runner != nil && c.runner.IsAlive() {
+		return c.runner, nil
+	}
+	if c.autoReconnect {
+		if err := c.Reconnect(ctx); err != nil {
+			return nil, err
+		}
+		return c.runner, nil
+	}
+	if c.runner == nil {
+		return nil, fmt.Errorf("PSADT client has no runner")
+	}
+	return c.runner, nil
+}
+
+// onRunnerCommand is installed as the runner's OnCommand hook: it updates
+// client observability counters and forwards to the user-provided hook.
+func (c *Client) onRunnerCommand(cmd string, duration time.Duration, err error) {
+	c.commandCount.Add(1)
+	if err != nil {
+		c.lastErrMu.Lock()
+		c.lastErr = err
+		c.lastErrMu.Unlock()
+	}
+	if c.onCommand != nil {
+		c.onCommand(cmd, duration, err)
+	}
+}
 // defaultContext returns a context with the client's default timeout.
 func (c *Client) defaultContext() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), c.timeout)
