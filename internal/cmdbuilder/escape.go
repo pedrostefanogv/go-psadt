@@ -26,13 +26,18 @@ func EscapeString(s string) string {
 }
 
 // isLiteral checks if a string is a PowerShell literal that should not be quoted.
+// SECURITY: strings starting with "$" are only treated as literals when they are
+// simple variable references (letters, digits, "_", ":", "."). Anything that
+// contains sub-expressions, separators or whitespace — e.g. "$(Remove-Item ...)",
+// "${...}", "$a; b" — is quoted as a plain string, preventing code injection
+// through user-controlled values (app names, messages, registry paths, etc.).
 func isLiteral(s string) bool {
 	// PS booleans
 	if s == "$true" || s == "$false" || s == "$null" {
 		return true
 	}
-	// PS variables
-	if strings.HasPrefix(s, "$") {
+	// Simple PS variable references only
+	if strings.HasPrefix(s, "$") && isSimplePSVariable(s) {
 		return true
 	}
 	// Pure numeric
@@ -40,6 +45,24 @@ func isLiteral(s string) bool {
 		return true
 	}
 	return false
+}
+
+// isSimplePSVariable reports whether s matches $[A-Za-z_][A-Za-z0-9_.:]*.
+func isSimplePSVariable(s string) bool {
+	if len(s) < 2 {
+		return false
+	}
+	c := s[1]
+	if !(c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) {
+		return false
+	}
+	for i := 2; i < len(s); i++ {
+		c = s[i]
+		if !(c == '_' || c == '.' || c == ':' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) {
+			return false
+		}
+	}
+	return true
 }
 
 // isNumeric checks if a string is a valid number.
@@ -125,6 +148,10 @@ func FormatHashtable(v reflect.Value) string {
 			pairs = append(pairs, fmt.Sprintf("%s=%s", key, EscapeString(fieldVal.String())))
 		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 			pairs = append(pairs, fmt.Sprintf("%s=%d", key, fieldVal.Int()))
+		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			pairs = append(pairs, fmt.Sprintf("%s=%d", key, fieldVal.Uint()))
+		case reflect.Float32, reflect.Float64:
+			pairs = append(pairs, fmt.Sprintf("%s=%g", key, fieldVal.Float()))
 		case reflect.Bool:
 			if fieldVal.Bool() {
 				pairs = append(pairs, fmt.Sprintf("%s=$true", key))

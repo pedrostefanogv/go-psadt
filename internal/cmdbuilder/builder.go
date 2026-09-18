@@ -194,23 +194,29 @@ func formatMapParam(name string, v reflect.Value) string {
 	for _, key := range v.MapKeys() {
 		val := v.MapIndex(key)
 		keyStr := fmt.Sprintf("%v", key.Interface())
-		valStr := fmt.Sprintf("%v", val.Interface())
 
-		// Use the underlying elem kind for interface{} values
-		valKind := val.Kind()
-		if valKind == reflect.Interface && !val.IsNil() {
-			valKind = val.Elem().Kind()
+		// Use the underlying elem value/kind for interface{} values
+		valElem := val
+		if valElem.Kind() == reflect.Interface && !valElem.IsNil() {
+			valElem = valElem.Elem()
 		}
+		valKind := valElem.Kind()
 
 		switch valKind {
+		case reflect.Bool:
+			// Booleans must be emitted as $true/$false literals — quoting them
+			// ("True"/"true") would pass a string where PSADT expects a bool.
+			if valElem.Bool() {
+				pairs = append(pairs, fmt.Sprintf("%s=$true", EscapeString(keyStr)))
+			} else {
+				pairs = append(pairs, fmt.Sprintf("%s=$false", EscapeString(keyStr)))
+			}
 		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
 			reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
 			reflect.Float32, reflect.Float64:
-			pairs = append(pairs, fmt.Sprintf("%s=%s", EscapeString(keyStr), valStr))
-		case reflect.Bool:
-			pairs = append(pairs, fmt.Sprintf("%s=%s", EscapeString(keyStr), EscapeString(valStr)))
+			pairs = append(pairs, fmt.Sprintf("%s=%v", EscapeString(keyStr), valElem.Interface()))
 		default:
-			pairs = append(pairs, fmt.Sprintf("%s=%s", EscapeString(keyStr), EscapeString(valStr)))
+			pairs = append(pairs, fmt.Sprintf("%s=%s", EscapeString(keyStr), EscapeString(fmt.Sprintf("%v", valElem.Interface()))))
 		}
 	}
 

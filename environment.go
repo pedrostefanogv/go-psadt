@@ -149,8 +149,7 @@ func (c *Client) GetEnvironmentWithContext(ctx context.Context) (*types.Environm
     Misc = @{
         RunningTaskSequence = [bool]$RunningTaskSequence
     }
-} | ConvertTo-Json -Depth 5
-`
+}`
 
 	c.logger.Debug("collecting PSADT environment variables")
 

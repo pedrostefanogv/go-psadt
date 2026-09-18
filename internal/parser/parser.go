@@ -5,6 +5,7 @@ package parser
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 // Response represents the standard JSON wrapper returned by every PowerShell command.
@@ -55,10 +56,32 @@ func ParseInto(resp *Response, target interface{}) error {
 	}
 
 	if err := json.Unmarshal(resp.Data, target); err != nil {
+		// PowerShell double-encodes when a command pre-converts its output
+		// with ConvertTo-Json: Data then arrives as a JSON *string* containing
+		// JSON. Unwrap one level and retry before giving up.
+		if isStringEncodedJSON(resp.Data) {
+			var inner string
+			if json.Unmarshal(resp.Data, &inner) == nil {
+				if err2 := json.Unmarshal([]byte(inner), target); err2 == nil {
+					return nil
+				}
+			}
+		}
 		return fmt.Errorf("failed to unmarshal response data: %w (raw: %s)", err, truncate(string(resp.Data), 200))
 	}
 
 	return nil
+}
+
+// isStringEncodedJSON reports whether data is a JSON string whose content
+// itself starts as a JSON object or array.
+func isStringEncodedJSON(data []byte) bool {
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return false
+	}
+	s = strings.TrimSpace(s)
+	return strings.HasPrefix(s, "{") || strings.HasPrefix(s, "[")
 }
 
 // ParseResponse is a convenience function that combines Parse + ParseInto.
