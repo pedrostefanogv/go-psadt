@@ -80,6 +80,13 @@ Example-specific docs and entry points:
 | **Type-safe options** | All parameters are Go structs with `ps:` struct tags — no raw strings |
 | **Session management** | Full Open/Close ADT session lifecycle with configuration |
 | **Dual PowerShell support** | Windows PowerShell 5.1 and PowerShell 7+ |
+| **Auto PS7 preference** | `WithAutoPreferPS7()` picks pwsh.exe with 5.1 fallback |
+| **Auto reconnect** | `WithAutoReconnect()` transparently restarts a dead PowerShell host |
+| **Observability** | `CommandCount()`, `LastError()`, `Uptime()`, per-command `OnCommand` hook, live output streaming |
+| **Client pool** | `NewClientPool` for parallel deployments (one persistent PS host each) |
+| **Abort stuck installs** | `Client.Abort()` force-kills the whole process tree (installer included) |
+| **RMM helpers** | `NotifyUpdate` (countdown + defer + save prompt), `NotifyProgress`, `NotifyInfo` |
+| **Exported typed errors** | `IsRebootRequired`, `IsUserCancelled`, `IsAccessDenied`, `IsTimeout`, `IsFileNotFound`, `IsNetworkError` |
 | **Structured error handling** | PSADT errors are parsed into Go error types with stack traces |
 | **Context support** | All operations support `context.Context` for timeouts and cancellation |
 | **Windows-only build** | Uses `//go:build windows` — cleanly excluded on other platforms |
@@ -217,6 +224,9 @@ psadt.WithPowerShell7()                 // Use PowerShell 7+ (pwsh.exe)
 psadt.WithMinModuleVersion("4.1.0")     // Minimum PSADT module version
 psadt.WithLogger(myLogger)              // Custom *slog.Logger for diagnostics
 psadt.WithEnvCacheTTL(5 * time.Minute) // TTL for GetEnvironment cache (default: 5min, 0=disable)
+psadt.WithAutoPreferPS7()               // prefer pwsh.exe, fall back to powershell.exe
+psadt.WithAutoReconnect()               // restart dead PowerShell host transparently
+psadt.OnCommand(func(cmd string, d time.Duration, err error) { ... }) // per-command metrics
 ```
 
 ## Advanced Usage

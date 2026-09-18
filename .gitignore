@@ -19,6 +19,9 @@ profile.cov
 # Dependency directories (remove the comment below to include it)
 # vendor/
 
+# Local Go build cache (used when the default cache is outside the sandbox)
+.gocache/
+
 # Go workspace file
 go.work
 go.work.sum

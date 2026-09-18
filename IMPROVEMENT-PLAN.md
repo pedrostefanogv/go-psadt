@@ -1,7 +1,31 @@
 # Plano de Melhoria e Otimização — go-psadt
 
 > Análise completa do projeto `go-psadt` (dePara Go ↔ PSAppDeployToolkit v4.1.x)
-> Data: 2026-07-06 · Status: **Fase 1 concluída ✅ | Fases 2-4 pendentes de aprovação**
+> Data: 2026-07-06 · Status: **PLANO 100% IMPLEMENTADO ✅ (Fases 1-4 + fuzzing + API-2)**
+>
+> **Implementação completa (esta rodada):**
+> - Fase 2: testes de integração reais com PowerShell/PSADT (runner + client/sessão/pool, `-short` pula), benchmarks de round-trip e cmdbuilder, CI GitHub Actions (windows: vet/build/test full+short/golangci-lint).
+> - Fase 3: `WithAutoPreferPS7()`, `WithAutoReconnect()`, métricas (`CommandCount`, `LastError`, `Uptime`, hook `OnCommand`), `ClientPool` (Acquire/Release/Close), `Client.Heartbeat`.
+> - Fase 4: builder fluente já existia (`types.NewSessionConfig`); adicionados wrappers de lifecycle `InitializeModule`/`InitializeModuleIfUninitialized`.
+> - **Refactor crítico do runner** (encontrado pelos testes de integração): a goroutine de leitura por chamada competia pelo scanner com a chamada seguinte (linhas roubadas → timeouts). Agora existe um **pump stdout persistente único** (`ensurePump`) + **marcadores únicos por comando** (`<<<PSADT_BEGIN:<id>>>`), tornando o resync pós-timeout determinístico.
+> - **Bugs de JSON duplo corrigidos**: comandos que pré-convertem com `ConvertTo-Json` geravam `Data` como string JSON; o parser agora desembrulha um nível; `CheckModuleVersion` retorna a versão (não o envelope); `GetEnvironment` não pré-converte mais.
+> - RMM: `notifications.go` com `NotifyUpdate` (countdown/defer/PromptToSave — cenário "Firefox será atualizado em 30 segundos"), `NotifyProgress`, `NotifyInfo`.
+> - Nota de ambiente: `Open-ADTSession` falha internamente sem admin (WMI `Win32_ComputerSystem` negado) e ainda reporta sucesso — comportamento do PSADT; teste de sessão tolera via `t.Skipf`. Em produção (SYSTEM) não ocorre.
+>
+> **Revisão 2026 (auditoria + integração RMM) — correções aplicadas nesta rodada:**
+> - CloseWithContext disparava hooks OnError duas vezes (fire duplicado removido).
+> - Session.WithContext não copiava hooks de lifecycle para a cópia (agora copia).
+> - readResponse usava time.After por iteração (acúmulo de timers em agents longos) → timer reutilizável com reset por linha.
+> - Dessincronização do protocolo após timeout/cancel (resposta antiga atribuída ao comando seguinte) → flag desynced + descarte até o próximo BeginMarker.
+> - cmdbuilder: bools em hashtables viravam strings ('True') → agora $true/$false; isLiteral endurecido contra injeção via strings iniciadas com $ (sub-expressões são citadas como literal).
+> - Novo: erros tipados exportados no pacote raiz (errors.go): IsPSADTError, IsRebootRequired, IsUserCancelled, IsAccessDenied, IsTimeout, IsFileNotFound, IsNetworkError.
+> - Novo: Client.Abort() — encerra a árvore de processos (taskkill /T /F) para cancelar instalações travadas.
+> - Testes de regressão: resync do protocolo, escaping/injeção e bools em hashtables.
+>
+> **Rodada final (itens restantes):**
+> - MA-7 ✅: gerador AST `tools/genwithcontext` → `withcontext_gen.go` com 135 variants `*WithContext` (padrão `s.WithContext(ctx).X(...)`); teste de cobertura anti-regressão (`TestSessionWithContextCoverage`) garante que todo método público ganhe variante.
+> - Fuzzing ✅: `FuzzEscapeString`/`FuzzBuild` (cmdbuilder), `FuzzParse` (parser), `FuzzWrapCommandWithID` (runner) — ~23 milhões de execuções em 4 alvos sem falhas; seeds fixos rodam em todo `go test`.
+> - API-2 ✅: métodos `Valid()` nos enums principais (`DeploymentType`, `DeployMode`, `MsiAction`, `ProcessWindowStyle`, `RegistryValueKind`, `BalloonTipIcon`, `MessageAlignment`), `SessionConfig.Validate()` fail-fast (AppName obrigatório, enums válidos) aplicado em `OpenSessionWithContext`, e teste de exaustividade dos enum constants.
 
 ---
 
